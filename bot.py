@@ -76,6 +76,16 @@ def init_database():
         )
     ''')
     
+    # Tabla para contratos dinámicos
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contratos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            enlace TEXT NOT NULL,
+            fecha_creacion TEXT NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -188,6 +198,24 @@ def set_categoria(item: str, categoria: str):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO item_categoria (item, categoria) VALUES (?, ?)", (item.lower(), categoria))
+    conn.commit()
+    conn.close()
+
+def get_contratos():
+    """Obtiene todos los contratos almacenados"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre, enlace FROM contratos ORDER BY id")
+    contratos = cursor.fetchall()
+    conn.close()
+    return contratos
+
+def add_contrato(nombre: str, enlace: str):
+    """Añade un nuevo contrato a la base de datos"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    cursor.execute("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)", (nombre, enlace, fecha))
     conn.commit()
     conn.close()
 
@@ -1214,11 +1242,13 @@ class BotoneraView(discord.ui.View):
     # -----------------
     @discord.ui.button(label="Contratos", style=discord.ButtonStyle.secondary, row=1)
     async def contratos_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        mensaje = "**📋 Contratos disponibles:** *(EN PRUEBAS)*\n\n"
-        mensaje += "**Contrato1:** @https://contratos.corvusnocta.org/contrato/f88e3ec3d98ef12c\n"
-        mensaje += "**Contrato2:** @https://contratos.corvusnocta.org/contrato/f88e3ec3d98ef12c\n"
-        mensaje += "**Contrato3:** @https://contratos.corvusnocta.org/contrato/f88e3ec3d98ef12c\n"
-        mensaje += "**Contrato4:** @https://contratos.corvusnocta.org/contrato/f88e3ec3d98ef12c"
+        contratos = get_contratos()
+        if not contratos:
+            mensaje = "**📋 Contratos disponibles:**\n\n❌ No hay contratos disponibles en este momento."
+        else:
+            mensaje = "**📋 Contratos disponibles:**\n\n"
+            for i, (nombre, enlace) in enumerate(contratos, 1):
+                mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
         await interaction.response.send_message(mensaje, ephemeral=True)
         await self.volver_menu(interaction)
 
@@ -1229,5 +1259,45 @@ class BotoneraView(discord.ui.View):
 async def menu(ctx):
     view = BotoneraView()
     await ctx.send("Selecciona una opción del menú:", view=view)
+
+# =========================
+# COMANDO PARA AÑADIR CONTRATOS
+# =========================
+@bot.command(name="contratos")
+async def contratos(ctx, *, args):
+    """
+    Comando para añadir contratos: //contratos (nombre del contrato) (enlace)
+    Ejemplo: //contratos Armadura Corvus https://contratos.corvusnocta.org/contrato/5d4ef1a9c5064185
+    """
+    try:
+        # Dividir el mensaje en nombre y enlace
+        partes = args.strip().split()
+        if len(partes) < 2:
+            await ctx.send("❌ **Formato incorrecto.**\n\n**Uso:** `//contratos (nombre del contrato) (enlace)`\n**Ejemplo:** `//contratos Armadura Corvus https://contratos.corvusnocta.org/contrato/5d4ef1a9c5064185`")
+            return
+        
+        # El último elemento es el enlace, el resto es el nombre
+        enlace = partes[-1]
+        nombre = " ".join(partes[:-1])
+        
+        # Validar que el enlace sea válido
+        if not enlace.startswith(('http://', 'https://')):
+            await ctx.send("❌ **Enlace inválido.** Debe empezar con `http://` o `https://`")
+            return
+        
+        # Añadir el contrato a la base de datos
+        add_contrato(nombre, enlace)
+        
+        # Crear mensaje de anuncio con emojis
+        mensaje_anuncio = f"** ATENCIÓN SE HAN PUBLICADO NUEVOS EVENTOS Y CONTRATOS:**\n\n**{nombre.upper()}**\n{enlace}"
+        
+        # Enviar el mensaje de anuncio al canal
+        await ctx.send(mensaje_anuncio)
+        
+        # Confirmar al usuario que se añadió correctamente
+        await ctx.send(f"✅ **Contrato añadido exitosamente:**\n**{nombre}**\n{enlace}", ephemeral=True)
+        
+    except Exception as e:
+        await ctx.send(f"❌ **Error al procesar el contrato:** {str(e)}", ephemeral=True)
 
 bot.run(TOKEN)
