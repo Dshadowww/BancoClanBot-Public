@@ -136,7 +136,16 @@ def update_registro_usuario(user_id, item, cantidad):
     """Actualiza el registro de un usuario para un item específico"""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO registro_usuarios (user_id, item, cantidad) VALUES (?, ?, ?)", (user_id, item, cantidad))
+    
+    # Prevenir cantidades negativas
+    cantidad_final = max(0, cantidad)
+    
+    # Si la cantidad es 0, eliminar el registro en lugar de guardarlo
+    if cantidad_final == 0:
+        cursor.execute("DELETE FROM registro_usuarios WHERE user_id = ? AND item = ?", (user_id, item))
+    else:
+        cursor.execute("INSERT OR REPLACE INTO registro_usuarios (user_id, item, cantidad) VALUES (?, ?, ?)", (user_id, item, cantidad_final))
+    
     conn.commit()
     conn.close()
 
@@ -856,256 +865,268 @@ class BotoneraView(discord.ui.View):
         await self.volver_menu(interaction)
 
     # -----------------
-    # TRANSFERIR
+    # TRANSFERIR (DESHABILITADO)
     # -----------------
-    @discord.ui.button(label="Transferir", style=discord.ButtonStyle.blurple)
-    async def transferir_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        class TransferirTipoView(discord.ui.View):
-            def __init__(self):
-                super().__init__(timeout=60)
+    # @discord.ui.button(label="Transferir", style=discord.ButtonStyle.blurple)
+    # async def transferir_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+    #     class TransferirTipoView(discord.ui.View):
+    #         def __init__(self):
+    #             super().__init__(timeout=60)
+    #
+    #         @discord.ui.button(label="Reputación", style=discord.ButtonStyle.green)
+    #         async def reputacion_btn(self, interaction2: discord.Interaction, button2: discord.ui.Button):
+    #             # Modal combinado para reputación
+    #             class ReputacionTransferModal(discord.ui.Modal, title="Transferir Reputación"):
+    #                     def __init__(self):
+    #                         super().__init__()
+    #                         self.cantidad_input = discord.ui.TextInput(
+    #                             label="Cantidad de reputación a transferir",
+    #                             placeholder="Ej: 10.5",
+    #                             required=True,
+    #                             max_length=15
+    #                         )
+    #                         self.add_item(self.cantidad_input)
 
-            @discord.ui.button(label="Reputación", style=discord.ButtonStyle.green)
-            async def reputacion_btn(self, interaction2: discord.Interaction, button2: discord.ui.Button):
-                # Modal combinado para reputación
-                class ReputacionTransferModal(discord.ui.Modal, title="Transferir Reputación"):
-                    def __init__(self):
-                        super().__init__()
-                        self.cantidad_input = discord.ui.TextInput(
-                            label="Cantidad de reputación a transferir",
-                            placeholder="Ej: 10.5",
-                            required=True,
-                            max_length=15
-                        )
-                        self.add_item(self.cantidad_input)
-
-                    async def on_submit(self, interaction: discord.Interaction):
-                        cantidad_texto = self.cantidad_input.value.strip()
-                        if not es_decimal_positivo(cantidad_texto):
-                            await interaction.response.send_message("❌ Cantidad inválida. Usa solo números positivos (ej. 10 o 10.5).", ephemeral=True)
-                            return
-                        cantidad = float(cantidad_texto)
+    #                     async def on_submit(self, interaction: discord.Interaction):
+    #                         cantidad_texto = self.cantidad_input.value.strip()
+    #                         if not es_decimal_positivo(cantidad_texto):
+    #                             await interaction.response.send_message("❌ Cantidad inválida. Usa solo números positivos (ej. 10 o 10.5).", ephemeral=True)
+    #                             return
+    #                         cantidad = float(cantidad_texto)
                         
-                        reputacion_actual = get_reputacion_usuario(interaction.user.id)
-                        if reputacion_actual < cantidad:
-                            await interaction.response.send_message("❌ No tienes suficiente reputación.", ephemeral=True)
-                            return
+    #                         reputacion_actual = get_reputacion_usuario(interaction.user.id)
+    #                         if reputacion_actual < cantidad:
+    #                             await interaction.response.send_message("❌ No tienes suficiente reputación.", ephemeral=True)
+    #                             return
                         
-                        await interaction.response.defer(ephemeral=True)
+    #                         await interaction.response.defer(ephemeral=True)
                         
-                        class RecipientSelect(discord.ui.UserSelect):
-                            def __init__(self):
-                                super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
-                            async def callback(self, i: discord.Interaction):
-                                usuario = self.values[0]
+    #                         class RecipientSelect(discord.ui.UserSelect):
+    #                             def __init__(self):
+    #                                 super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
+    #                             async def callback(self, i: discord.Interaction):
+    #                                 usuario = self.values[0]
                                 
                                 # Actualizar reputación del remitente
-                                update_reputacion(interaction.user.id, reputacion_actual - cantidad)
+    #                                 update_reputacion(interaction.user.id, reputacion_actual - cantidad)
                                 
                                 # Actualizar reputación del destinatario
-                                reputacion_destinatario = get_reputacion_usuario(usuario.id)
-                                update_reputacion(usuario.id, reputacion_destinatario + cantidad)
+    #                                 reputacion_destinatario = get_reputacion_usuario(usuario.id)
+    #                                 update_reputacion(usuario.id, reputacion_destinatario + cantidad)
                                 
                                 # Registrar en historial con destinatario
-                                add_historial(interaction.user.id, "Transferido", f"Reputación → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
-                                add_historial(usuario.id, "Recibido", f"Reputación ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
+    #                                 add_historial(interaction.user.id, "Transferido", f"Reputación → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
+    #                                 add_historial(usuario.id, "Recibido", f"Reputación ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
                                 
-                                await i.response.send_message(f"✅ Transferidos {cantidad:.2f} :ReputacionCorvus: a {usuario.mention}", ephemeral=True)
-                                await BotoneraView().volver_menu(interaction)
+    #                                 await i.response.send_message(f"✅ Transferidos {cantidad:.2f} :ReputacionCorvus: a {usuario.mention}", ephemeral=True)
+    #                                 await BotoneraView().volver_menu(interaction)
                         
-                        class RecipientSelectView(discord.ui.View):
-                            def __init__(self):
-                                super().__init__(timeout=60)
-                                self.add_item(RecipientSelect())
+    #                         class RecipientSelectView(discord.ui.View):
+    #                             def __init__(self):
+    #                                 super().__init__(timeout=60)
+    #                                 self.add_item(RecipientSelect())
                         
-                        await interaction.followup.send("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
+    #                         await interaction.followup.send("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
                 
-                modal = ReputacionTransferModal()
-                await interaction2.response.send_modal(modal)
+    #                 modal = ReputacionTransferModal()
+    #                 await interaction2.response.send_modal(modal)
 
-            @discord.ui.button(label="Material", style=discord.ButtonStyle.blurple)
-            async def material_btn(self, interaction2: discord.Interaction, button2: discord.ui.Button):
+    #             @discord.ui.button(label="Material", style=discord.ButtonStyle.blurple)
+    #             async def material_btn(self, interaction2: discord.Interaction, button2: discord.ui.Button):
                 # Modal con sistema de búsqueda inteligente para transferencia de material
-                class MaterialTransferModal(discord.ui.Modal, title="Transferir Material"):
-                    def __init__(self):
-                        super().__init__()
-                        self.cantidad_input = discord.ui.TextInput(
-                            label="Cantidad a transferir",
-                            placeholder="Ej: 10",
-                            required=True,
-                            max_length=10
-                        )
-                        self.busqueda_input = discord.ui.TextInput(
-                            label="Buscar objeto a transferir",
-                            placeholder="Escribe para buscar (ej: p4, scu iron...)",
-                            required=True,
-                            max_length=50
-                        )
-                        self.add_item(self.cantidad_input)
-                        self.add_item(self.busqueda_input)
+    #                 class MaterialTransferModal(discord.ui.Modal, title="Transferir Material"):
+    #                     def __init__(self):
+    #                         super().__init__()
+    #                         self.cantidad_input = discord.ui.TextInput(
+    #                             label="Cantidad a transferir",
+    #                             placeholder="Ej: 10",
+    #                             required=True,
+    #                             max_length=10
+    #                         )
+    #                         self.busqueda_input = discord.ui.TextInput(
+    #                             label="Buscar objeto a transferir",
+    #                             placeholder="Escribe para buscar (ej: p4, scu iron...)",
+    #                             required=True,
+    #                             max_length=50
+    #                         )
+    #                         self.add_item(self.cantidad_input)
+    #                         self.add_item(self.busqueda_input)
 
-                    async def on_submit(self, interaction: discord.Interaction):
+    #                     async def on_submit(self, interaction: discord.Interaction):
                         # Validar cantidad
-                        cantidad_texto = self.cantidad_input.value.strip()
-                        if not es_entero_positivo(cantidad_texto):
-                            await interaction.response.send_message("❌ Cantidad inválida. Usa solo números enteros positivos.", ephemeral=True)
-                            return
-                        cantidad = int(cantidad_texto)
+    #                         cantidad_texto = self.cantidad_input.value.strip()
+    #                         if not es_entero_positivo(cantidad_texto):
+    #                             await interaction.response.send_message("❌ Cantidad inválida. Usa solo números enteros positivos.", ephemeral=True)
+    #                             return
+    #                         cantidad = int(cantidad_texto)
                         
                         # Buscar objetos en el inventario del usuario
-                        termino_busqueda = self.busqueda_input.value.strip()
-                        resultados = buscar_objetos_inventario(termino_busqueda, interaction.user.id, 25)
+    #                         termino_busqueda = self.busqueda_input.value.strip()
+    #                         resultados = buscar_objetos_inventario(termino_busqueda, interaction.user.id, 25)
                         
-                        if not resultados:
-                            await interaction.response.send_message(f"❌ No se encontraron objetos que coincidan con '{termino_busqueda}' en tu inventario. Verifica el nombre o intenta con un término más general.", ephemeral=True)
-                            return
+    #                         if not resultados:
+    #                             await interaction.response.send_message(f"❌ No se encontraron objetos que coincidan con '{termino_busqueda}' en tu inventario. Verifica el nombre o intenta con un término más general.", ephemeral=True)
+    #                             return
                         
                         # Si hay muchos resultados, mostrar selección
-                        if len(resultados) > 1:
-                            await self.mostrar_seleccion(interaction, resultados, cantidad)
-                        else:
-                            objeto_seleccionado = resultados[0]
-                            await self.procesar_transferencia(interaction, objeto_seleccionado, cantidad)
+    #                         if len(resultados) > 1:
+    #                             await self.mostrar_seleccion(interaction, resultados, cantidad)
+    #                         else:
+    #                             objeto_seleccionado = resultados[0]
+    #                             await self.procesar_transferencia(interaction, objeto_seleccionado, cantidad)
                     
-                    async def mostrar_seleccion(self, interaction, resultados, cantidad):
-                        termino_busqueda = self.busqueda_input.value.strip()  # Obtener el término de búsqueda
+    #                     async def mostrar_seleccion(self, interaction, resultados, cantidad):
+    #                         termino_busqueda = self.busqueda_input.value.strip()  # Obtener el término de búsqueda
                         
-                        class SeleccionTransferView(discord.ui.View):
-                            def __init__(self, resultados, cantidad):
-                                super().__init__(timeout=60)
-                                self.resultados = resultados
-                                self.cantidad = cantidad
-                                self.used = False
+    #                         class SeleccionTransferView(discord.ui.View):
+    #                             def __init__(self, resultados, cantidad):
+    #                                 super().__init__(timeout=60)
+    #                                 self.resultados = resultados
+    #                                 self.cantidad = cantidad
+    #                                 self.used = False
                                 
                                 # Crear botones para cada resultado
-                                for i, resultado in enumerate(resultados[:25]):
-                                    label = resultado['nombre'][:80]
-                                    if len(resultado['nombre']) > 80:
-                                        label += "..."
+    #                                 for i, resultado in enumerate(resultados[:25]):
+    #                                     label = resultado['nombre'][:80]
+    #                                     if len(resultado['nombre']) > 80:
+    #                                         label += "..."
                                     
-                                    button = discord.ui.Button(
-                                        label=f"{i+1}. {label}",
-                                        style=discord.ButtonStyle.secondary,
-                                        custom_id=f"select_{i}"
-                                    )
+    #                                     button = discord.ui.Button(
+    #                                         label=f"{i+1}. {label}",
+    #                                         style=discord.ButtonStyle.secondary,
+    #                                         custom_id=f"select_{i}"
+    #                                     )
                                     
                                     # Crear callback específico para este botón
-                                    async def button_callback(interaction, obj=resultado):
-                                        await self.seleccionar_objeto(interaction, obj)
+    #                                     async def button_callback(interaction, obj=resultado):
+    #                                         await self.seleccionar_objeto(interaction, obj)
                                     
-                                    button.callback = button_callback
-                                    self.add_item(button)
+    #                                     button.callback = button_callback
+    #                                     self.add_item(button)
                             
-                            async def seleccionar_objeto(self, interaction, objeto):
-                                if self.used:
-                                    await interaction.response.send_message("Esta selección ya fue usada. Inicia de nuevo el proceso.", ephemeral=True)
-                                    return
-                                self.used = True
+    #                             async def seleccionar_objeto(self, interaction, objeto):
+    #                                 if self.used:
+    #                                     await interaction.response.send_message("Esta selección ya fue usada. Inicia de nuevo el proceso.", ephemeral=True)
+    #                                     return
+    #                                 self.used = True
                                 
-                                try:
-                                    await interaction.message.delete()
-                                except Exception:
-                                    pass
+    #                                 try:
+    #                                     await interaction.message.delete()
+    #                                 except Exception:
+    #                                     pass
                                 
-                                await interaction.response.defer(ephemeral=True)
-                                await self.procesar_transferencia(interaction, objeto, self.cantidad)
+    #                                 await interaction.response.defer(ephemeral=True)
+    #                                 await self.procesar_transferencia(interaction, objeto, self.cantidad)
                             
-                            async def procesar_transferencia(self, interaction, objeto, cantidad):
-                                nombre = objeto['nombre']
+    #                             async def procesar_transferencia(self, interaction, objeto, cantidad):
+    #                                 nombre = objeto['nombre']
                                 
-                                if nombre not in get_registro_usuario(interaction.user.id) or get_registro_usuario(interaction.user.id)[nombre] < cantidad:
-                                    await interaction.followup.send("❌ No tienes suficiente cantidad o el objeto no existe.", ephemeral=True)
-                                    return
+    #                                 if nombre not in get_registro_usuario(interaction.user.id) or get_registro_usuario(interaction.user.id)[nombre] < cantidad:
+    #                                     await interaction.followup.send("❌ No tienes suficiente cantidad o el objeto no existe.", ephemeral=True)
+    #                                     return
                                 
-                                class RecipientSelect(discord.ui.UserSelect):
-                                    def __init__(self):
-                                        super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
+    #                                 class RecipientSelect(discord.ui.UserSelect):
+    #                                     def __init__(self):
+    #                                         super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
                                     
-                                    async def callback(self, i: discord.Interaction):
-                                        usuario = self.values[0]
+    #                                     async def callback(self, i: discord.Interaction):
+    #                                         usuario = self.values[0]
+                                        
+                                        # Verificar que el remitente tiene suficiente cantidad
+    #                                         registro_usuario = get_registro_usuario(interaction.user.id)
+    #                                         cantidad_actual_remitente = registro_usuario.get(nombre, 0)
+                                        
+    #                                         if cantidad_actual_remitente < cantidad:
+    #                                             await i.response.send_message(f"❌ No tienes suficiente cantidad de {nombre}. Disponible: {cantidad_actual_remitente}", ephemeral=True)
+    #                                             return
                                         
                                         # Actualizar registro del remitente
-                                        registro_usuario = get_registro_usuario(interaction.user.id)
-                                        cantidad_actual_remitente = registro_usuario.get(nombre, 0)
-                                        update_registro_usuario(interaction.user.id, nombre, cantidad_actual_remitente - cantidad)
+    #                                         update_registro_usuario(interaction.user.id, nombre, cantidad_actual_remitente - cantidad)
                                         
                                         # Actualizar registro del destinatario
-                                        registro_destinatario = get_registro_usuario(usuario.id)
-                                        cantidad_actual_destinatario = registro_destinatario.get(nombre, 0)
-                                        update_registro_usuario(usuario.id, nombre, cantidad_actual_destinatario + cantidad)
+    #                                         registro_destinatario = get_registro_usuario(usuario.id)
+    #                                         cantidad_actual_destinatario = registro_destinatario.get(nombre, 0)
+    #                                         update_registro_usuario(usuario.id, nombre, cantidad_actual_destinatario + cantidad)
                                         
                                         # Registrar en historial con destinatario
-                                        add_historial(interaction.user.id, "Transferido", f"{nombre} → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
-                                        add_historial(usuario.id, "Recibido", f"{nombre} ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
+    #                                         add_historial(interaction.user.id, "Transferido", f"{nombre} → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
+    #                                         add_historial(usuario.id, "Recibido", f"{nombre} ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
                                         
-                                        await i.response.send_message(f"✅ Transferidos {cantidad} de {nombre} a {usuario.mention}", ephemeral=True)
-                                        view = BotoneraView()
-                                        await i.followup.send("Selecciona una opción del menú:", view=view, ephemeral=True)
+    #                                         await i.response.send_message(f"✅ Transferidos {cantidad} de {nombre} a {usuario.mention}", ephemeral=True)
+    #                                         view = BotoneraView()
+    #                                         await i.followup.send("Selecciona una opción del menú:", view=view, ephemeral=True)
                                 
-                                class RecipientSelectView(discord.ui.View):
-                                    def __init__(self):
-                                        super().__init__(timeout=60)
-                                        self.add_item(RecipientSelect())
+    #                                 class RecipientSelectView(discord.ui.View):
+    #                                     def __init__(self):
+    #                                         super().__init__(timeout=60)
+    #                                         self.add_item(RecipientSelect())
                                 
-                                await interaction.followup.send("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
+    #                                 await interaction.followup.send("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
                         
-                        view = SeleccionTransferView(resultados, cantidad)
+    #                         view = SeleccionTransferView(resultados, cantidad)
                         
                         # Crear mensaje con los resultados
-                        mensaje = f"🔍 **Resultados para '{termino_busqueda}'** ({len(resultados)} encontrados):\n\n"
-                        for i, resultado in enumerate(resultados[:25], 1):
-                            mensaje += f"**{i}.** {resultado['nombre']} ({resultado['categoria']}) - Disponible: {resultado['cantidad']}\n"
+    #                         mensaje = f"🔍 **Resultados para '{termino_busqueda}'** ({len(resultados)} encontrados):\n\n"
+    #                         for i, resultado in enumerate(resultados[:25], 1):
+    #                             mensaje += f"**{i}.** {resultado['nombre']} ({resultado['categoria']}) - Disponible: {resultado['cantidad']}\n"
                         
-                        if len(resultados) > 25:
-                            mensaje += f"\n... y {len(resultados) - 25} más. Usa un término más específico."
+    #                         if len(resultados) > 25:
+    #                             mensaje += f"\n... y {len(resultados) - 25} más. Usa un término más específico."
                         
-                        mensaje += f"\n\nSelecciona el objeto que quieres transferir:"
+    #                         mensaje += f"\n\nSelecciona el objeto que quieres transferir:"
                         
-                        await interaction.response.send_message(mensaje, view=view, ephemeral=True)
+    #                         await interaction.response.send_message(mensaje, view=view, ephemeral=True)
                     
-                    async def procesar_transferencia(self, interaction, objeto, cantidad):
-                        nombre = objeto['nombre']
+    #                     async def procesar_transferencia(self, interaction, objeto, cantidad):
+    #                         nombre = objeto['nombre']
                         
-                        if nombre not in get_registro_usuario(interaction.user.id) or get_registro_usuario(interaction.user.id)[nombre] < cantidad:
-                            await interaction.response.send_message("❌ No tienes suficiente cantidad o el objeto no existe.", ephemeral=True)
-                            return
+    #                         if nombre not in get_registro_usuario(interaction.user.id) or get_registro_usuario(interaction.user.id)[nombre] < cantidad:
+    #                             await interaction.response.send_message("❌ No tienes suficiente cantidad o el objeto no existe.", ephemeral=True)
+    #                             return
                         
-                        class RecipientSelect(discord.ui.UserSelect):
-                            def __init__(self):
-                                super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
+    #                         class RecipientSelect(discord.ui.UserSelect):
+    #                             def __init__(self):
+    #                                 super().__init__(placeholder="Elige destinatario", min_values=1, max_values=1)
                             
-                            async def callback(self, i: discord.Interaction):
-                                usuario = self.values[0]
+    #                             async def callback(self, i: discord.Interaction):
+    #                                 usuario = self.values[0]
+                                
+                                # Verificar que el remitente tiene suficiente cantidad
+    #                                 registro_usuario = get_registro_usuario(interaction.user.id)
+    #                                 cantidad_actual_remitente = registro_usuario.get(nombre, 0)
+                                
+    #                                 if cantidad_actual_remitente < cantidad:
+    #                                     await i.response.send_message(f"❌ No tienes suficiente cantidad de {nombre}. Disponible: {cantidad_actual_remitente}", ephemeral=True)
+    #                                     return
                                 
                                 # Actualizar registro del remitente
-                                registro_usuario = get_registro_usuario(interaction.user.id)
-                                cantidad_actual_remitente = registro_usuario.get(nombre, 0)
-                                update_registro_usuario(interaction.user.id, nombre, cantidad_actual_remitente - cantidad)
+    #                                 update_registro_usuario(interaction.user.id, nombre, cantidad_actual_remitente - cantidad)
                                 
                                 # Actualizar registro del destinatario
-                                registro_destinatario = get_registro_usuario(usuario.id)
-                                cantidad_actual_destinatario = registro_destinatario.get(nombre, 0)
-                                update_registro_usuario(usuario.id, nombre, cantidad_actual_destinatario + cantidad)
+    #                                 registro_destinatario = get_registro_usuario(usuario.id)
+    #                                 cantidad_actual_destinatario = registro_destinatario.get(nombre, 0)
+    #                                 update_registro_usuario(usuario.id, nombre, cantidad_actual_destinatario + cantidad)
                                 
                                 # Registrar en historial con destinatario
-                                add_historial(interaction.user.id, "Transferido", f"{nombre} → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
-                                add_historial(usuario.id, "Recibido", f"{nombre} ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
+    #                                 add_historial(interaction.user.id, "Transferido", f"{nombre} → {usuario.name}", -cantidad, usuario_relacionado=usuario.name)
+    #                                 add_historial(usuario.id, "Recibido", f"{nombre} ← {interaction.user.name}", cantidad, usuario_relacionado=interaction.user.name)
                                 
-                                await i.response.send_message(f"✅ Transferidos {cantidad} de {nombre} a {usuario.mention}", ephemeral=True)
-                                view = BotoneraView()
-                                await i.followup.send("Selecciona una opción del menú:", view=view, ephemeral=True)
+    #                                 await i.response.send_message(f"✅ Transferidos {cantidad} de {nombre} a {usuario.mention}", ephemeral=True)
+    #                                 view = BotoneraView()
+    #                                 await i.followup.send("Selecciona una opción del menú:", view=view, ephemeral=True)
                         
-                        class RecipientSelectView(discord.ui.View):
-                            def __init__(self):
-                                super().__init__(timeout=60)
-                                self.add_item(RecipientSelect())
+    #                         class RecipientSelectView(discord.ui.View):
+    #                             def __init__(self):
+    #                                 super().__init__(timeout=60)
+    #                                 self.add_item(RecipientSelect())
                         
-                        await interaction.response.send_message("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
+    #                         await interaction.response.send_message("Selecciona el destinatario:", view=RecipientSelectView(), ephemeral=True)
                 
-                modal = MaterialTransferModal()
-                await interaction2.response.send_modal(modal)
+    #                 modal = MaterialTransferModal()
+    #                 await interaction2.response.send_modal(modal)
 
-        view = TransferirTipoView()
-        await interaction.response.send_message("Selecciona qué quieres transferir:", view=view, ephemeral=True)
+    #     view = TransferirTipoView()
+    #     await interaction.response.send_message("Selecciona qué quieres transferir:", view=view, ephemeral=True)
 
     # -----------------
     # INVENTARIO
