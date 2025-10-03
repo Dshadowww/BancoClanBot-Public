@@ -1,11 +1,12 @@
 import os
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime
 import re
 import sqlite3
 import json
+import asyncio
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -378,6 +379,75 @@ def barra_progreso(total: int, limite: int, ancho: int = 8) -> str:
     return "[{}{}]".format("█"*bloques, "░"*(ancho-bloques))
 
 # =========================
+# FUNCIONES DE LIMPIEZA AUTOMÁTICA
+# =========================
+async def limpiar_canal_diario():
+    """Limpia todo el canal a las 12:00 del mediodía"""
+    try:
+        # Obtener el canal desde la variable de entorno o usar un canal por defecto
+        canal_id = os.getenv("CANAL_CONTRATOS_ID")
+        if not canal_id:
+            print("⚠️ CANAL_CONTRATOS_ID no configurado. No se puede limpiar el canal.")
+            return
+        
+        canal = bot.get_channel(int(canal_id))
+        if not canal:
+            print(f"❌ No se pudo encontrar el canal con ID: {canal_id}")
+            return
+        
+        # Limpiar todos los mensajes del canal
+        deleted = await canal.purge(limit=None)
+        print(f"🧹 Canal limpiado: {len(deleted)} mensajes eliminados")
+        
+    except Exception as e:
+        print(f"❌ Error al limpiar el canal: {e}")
+
+async def anunciar_contratos_diario():
+    """Anuncia todos los contratos disponibles a las 12:01"""
+    try:
+        # Obtener el canal desde la variable de entorno
+        canal_id = os.getenv("CANAL_CONTRATOS_ID")
+        if not canal_id:
+            print("⚠️ CANAL_CONTRATOS_ID no configurado. No se puede anunciar contratos.")
+            return
+        
+        canal = bot.get_channel(int(canal_id))
+        if not canal:
+            print(f"❌ No se pudo encontrar el canal con ID: {canal_id}")
+            return
+        
+        # Obtener todos los contratos de la base de datos
+        contratos = get_contratos()
+        
+        if not contratos:
+            mensaje = "🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado automáticamente a las 12:01**"
+        else:
+            mensaje = "🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
+            
+            for i, (nombre, enlace) in enumerate(contratos, 1):
+                mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
+            
+            mensaje += f"---\n💼 **Total de contratos activos: {len(contratos)}**\n⏰ **Actualizado automáticamente a las 12:01**"
+        
+        # Enviar mensaje con botonera pública
+        view = BotoneraView()
+        await canal.send(mensaje, view=view)
+        print(f"📢 Anuncio diario enviado: {len(contratos)} contratos")
+        
+    except Exception as e:
+        print(f"❌ Error al anunciar contratos: {e}")
+
+@tasks.loop(time=datetime.time(hour=12, minute=0))
+async def tarea_limpieza_diaria():
+    """Tarea programada para limpiar el canal a las 12:00"""
+    await limpiar_canal_diario()
+
+@tasks.loop(time=datetime.time(hour=12, minute=1))
+async def tarea_anuncio_diario():
+    """Tarea programada para anunciar contratos a las 12:01"""
+    await anunciar_contratos_diario()
+
+# =========================
 # EVENTO BOT READY
 # =========================
 @bot.event
@@ -386,6 +456,15 @@ async def on_ready():
     # Inicializar la base de datos al arrancar
     init_database()
     print("Base de datos inicializada correctamente")
+    
+    # Iniciar las tareas programadas
+    if not tarea_limpieza_diaria.is_running():
+        tarea_limpieza_diaria.start()
+        print("🕐 Tarea de limpieza diaria iniciada (12:00)")
+    
+    if not tarea_anuncio_diario.is_running():
+        tarea_anuncio_diario.start()
+        print("🕐 Tarea de anuncio diario iniciada (12:01)")
 
 # =========================
 # MODALES PARA INPUTS PRIVADOS
