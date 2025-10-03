@@ -18,7 +18,8 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
-DB_FILE = os.getenv("DB_FILE", "inventario.db")
+# Usar ruta persistente de Railway Volume
+DB_FILE = os.getenv("DB_FILE", "/app/data/inventario.db")
 DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
