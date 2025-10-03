@@ -20,7 +20,7 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
 # Usar ruta persistente de Railway Volume
-DB_FILE = os.getenv("DB_FILE", "/app/data/inventario.db")
+DB_FILE = os.getenv("DB_FILE", "/tmp/inventario.db")
 DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
@@ -220,6 +220,26 @@ def add_contrato(nombre: str, enlace: str):
     cursor.execute("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)", (nombre, enlace, fecha))
     conn.commit()
     conn.close()
+
+def delete_contrato(nombre: str):
+    """Elimina un contrato específico de la base de datos"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM contratos WHERE nombre = ?", (nombre,))
+    deleted_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_rows > 0
+
+def delete_all_contratos():
+    """Elimina todos los contratos de la base de datos"""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM contratos")
+    deleted_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_rows
 
 # =========================
 # SISTEMA DE BÚSQUEDA AVANZADA
@@ -1379,5 +1399,40 @@ async def contratos(ctx, *, args):
         
     except Exception as e:
         await ctx.send(f"❌ **Error al procesar el contrato:** {str(e)}", ephemeral=True)
+
+@bot.command(name="borrar_contrato")
+async def borrar_contrato(ctx, *, nombre):
+    """
+    Comando para borrar un contrato específico: //borrar_contrato (nombre del contrato)
+    Ejemplo: //borrar_contrato test3
+    """
+    try:
+        # Intentar eliminar el contrato
+        eliminado = delete_contrato(nombre)
+        
+        if eliminado:
+            await ctx.send(f"✅ **Contrato eliminado exitosamente:**\n**{nombre}**", ephemeral=True)
+        else:
+            await ctx.send(f"❌ **No se encontró el contrato:** {nombre}", ephemeral=True)
+        
+    except Exception as e:
+        await ctx.send(f"❌ **Error al eliminar el contrato:** {str(e)}", ephemeral=True)
+
+@bot.command(name="borrar_todos_contratos")
+async def borrar_todos_contratos(ctx):
+    """
+    Comando para borrar todos los contratos: //borrar_todos_contratos
+    """
+    try:
+        # Eliminar todos los contratos
+        eliminados = delete_all_contratos()
+        
+        if eliminados > 0:
+            await ctx.send(f"✅ **Se eliminaron {eliminados} contratos exitosamente.**", ephemeral=True)
+        else:
+            await ctx.send("❌ **No había contratos para eliminar.**", ephemeral=True)
+        
+    except Exception as e:
+        await ctx.send(f"❌ **Error al eliminar los contratos:** {str(e)}", ephemeral=True)
 
 bot.run(TOKEN)
