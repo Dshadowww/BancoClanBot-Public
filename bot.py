@@ -531,9 +531,9 @@ async def anunciar_contratos_diario():
         contratos = get_contratos()
         
         if not contratos:
-            mensaje = "🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado automáticamente a las 12:01**"
+            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado automáticamente a las 12:01**"
         else:
-            mensaje = "🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
+            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DIARIA DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
             
             for i, (nombre, enlace) in enumerate(contratos, 1):
                 mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
