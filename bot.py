@@ -254,7 +254,7 @@ except FileNotFoundError:
     print("⚠️ Sistema de búsqueda no encontrado. Usando sistema básico.")
 
 def buscar_objetos(termino_busqueda, limite=25):
-    """Busca objetos que coincidan con el término de búsqueda"""
+    """Busca objetos que coincidan con el término de búsqueda usando búsqueda híbrida"""
     if not sistema_busqueda:
         return []
     
@@ -262,20 +262,43 @@ def buscar_objetos(termino_busqueda, limite=25):
     if not termino:
         return []
     
-    resultados = []
+    resultados_prefijo = []
+    resultados_contenido = []
+    
     for nombre_normalizado, datos in sistema_busqueda.items():
-        if termino in nombre_normalizado:
-            resultados.append({
-                'nombre': datos['nombre_original'],
-                'categoria': datos['categoria']
+        nombre_original = datos['nombre_original']
+        nombre_lower = nombre_original.lower()
+        
+        # BÚSQUEDA POR PREFIJO (mayor prioridad)
+        if nombre_lower.startswith(termino):
+            resultados_prefijo.append({
+                'nombre': nombre_original,
+                'categoria': datos['categoria'],
+                'tipo': 'prefijo'
+            })
+        # BÚSQUEDA POR CONTENIDO (menor prioridad)
+        elif termino in nombre_lower:
+            resultados_contenido.append({
+                'nombre': nombre_original,
+                'categoria': datos['categoria'],
+                'tipo': 'contenido'
             })
     
-    # Ordenar por relevancia (coincidencias al inicio)
-    resultados.sort(key=lambda x: x['nombre'].lower().startswith(termino), reverse=True)
+    # Combinar resultados: prefijos primero, luego contenido
+    resultados = resultados_prefijo + resultados_contenido
+    
+    # Ordenar por relevancia adicional (coincidencias exactas primero)
+    resultados.sort(key=lambda x: (
+        x['tipo'] == 'prefijo',  # Prefijos primero
+        x['nombre'].lower() == termino,  # Coincidencias exactas
+        x['nombre'].lower().startswith(termino),  # Prefijos
+        len(x['nombre'])  # Nombres más cortos primero
+    ), reverse=True)
+    
     return resultados[:limite]
 
 def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
-    """Busca objetos que coincidan con el término de búsqueda y que estén en el inventario del usuario"""
+    """Busca objetos que coincidan con el término de búsqueda y que estén en el inventario del usuario usando búsqueda híbrida"""
     if not sistema_busqueda:
         return []
     
@@ -287,21 +310,45 @@ def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
     inventario_usuario = get_registro_usuario(user_id)
     objetos_disponibles = [nombre for nombre, cantidad in inventario_usuario.items() if cantidad > 0]
     
-    resultados = []
+    resultados_prefijo = []
+    resultados_contenido = []
+    
     for nombre_normalizado, datos in sistema_busqueda.items():
-        if termino in nombre_normalizado:
-            nombre_original = datos['nombre_original']
-            # Verificar si el usuario tiene este objeto
-            if nombre_original in objetos_disponibles:
-                cantidad_usuario = inventario_usuario[nombre_original]
-                resultados.append({
+        nombre_original = datos['nombre_original']
+        nombre_lower = nombre_original.lower()
+        
+        # Verificar si el usuario tiene este objeto
+        if nombre_original in objetos_disponibles:
+            cantidad_usuario = inventario_usuario[nombre_original]
+            
+            # BÚSQUEDA POR PREFIJO (mayor prioridad)
+            if nombre_lower.startswith(termino):
+                resultados_prefijo.append({
                     'nombre': nombre_original,
                     'categoria': datos['categoria'],
-                    'cantidad': cantidad_usuario
+                    'cantidad': cantidad_usuario,
+                    'tipo': 'prefijo'
+                })
+            # BÚSQUEDA POR CONTENIDO (menor prioridad)
+            elif termino in nombre_lower:
+                resultados_contenido.append({
+                    'nombre': nombre_original,
+                    'categoria': datos['categoria'],
+                    'cantidad': cantidad_usuario,
+                    'tipo': 'contenido'
                 })
     
-    # Ordenar por relevancia (coincidencias al inicio)
-    resultados.sort(key=lambda x: x['nombre'].lower().startswith(termino), reverse=True)
+    # Combinar resultados: prefijos primero, luego contenido
+    resultados = resultados_prefijo + resultados_contenido
+    
+    # Ordenar por relevancia adicional (coincidencias exactas primero)
+    resultados.sort(key=lambda x: (
+        x['tipo'] == 'prefijo',  # Prefijos primero
+        x['nombre'].lower() == termino,  # Coincidencias exactas
+        x['nombre'].lower().startswith(termino),  # Prefijos
+        len(x['nombre'])  # Nombres más cortos primero
+    ), reverse=True)
+    
     return resultados[:limite]
 
 def obtener_categoria_objeto(nombre_objeto):
@@ -612,16 +659,8 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
             required=True,
             max_length=50
         )
-        self.ubicacion_input = discord.ui.TextInput(
-            label="Ubicación (solo para añadir)",
-            placeholder="Ej: Terra, New Babbage...",
-            required=(tipo == "añadir"),
-            max_length=100
-        )
         self.add_item(self.cantidad_input)
         self.add_item(self.busqueda_input)
-        if tipo == "añadir":
-            self.add_item(self.ubicacion_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         # Validar cantidad
@@ -655,12 +694,11 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
         termino_busqueda = self.busqueda_input.value.strip()
         
         class SeleccionObjetoView(discord.ui.View):
-            def __init__(self, resultados, cantidad, tipo, ubicacion=None):
+            def __init__(self, resultados, cantidad, tipo):
                 super().__init__(timeout=60)
                 self.resultados = resultados
                 self.cantidad = cantidad
                 self.tipo = tipo
-                self.ubicacion = ubicacion
                 self.used = False
                 
                 # Crear botones para cada resultado (máximo 25)
@@ -748,7 +786,7 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                 update_registro_usuario(interaction.user.id, nombre, cantidad_usuario_actual + cantidad_posible)
                 
                 # Registrar en historial
-                add_historial(interaction.user.id, "Añadido", nombre, cantidad_posible, self.ubicacion)
+                add_historial(interaction.user.id, "Añadido", nombre, cantidad_posible)
                 
                 # Calcular y actualizar reputación
                 ganado = calcular_reputacion(categoria_existente, cantidad_posible)
@@ -756,7 +794,7 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                 update_reputacion(interaction.user.id, reputacion_actual + ganado)
                 add_historial(interaction.user.id, "Ganó Reputación", "Reputación", ganado)
                 
-                mensaje_respuesta = f"✅ {interaction.user.mention} añadió {cantidad_posible} de {nombre} ({categoria_existente}).\nUbicación registrada en tu historial.\nGanaste **{ganado:.2f}** :ReputacionCorvus:. Total: **{reputacion_actual + ganado:.2f}**"
+                mensaje_respuesta = f"✅ {interaction.user.mention} añadió {cantidad_posible} de {nombre} ({categoria_existente}).\nGanaste **{ganado:.2f}** :ReputacionCorvus:. Total: **{reputacion_actual + ganado:.2f}**"
                 if cantidad_posible < cantidad:
                     mensaje_respuesta += f"\n⚠️ Solo se pudieron añadir {cantidad_posible} debido al límite de almacenamiento."
                 
@@ -792,8 +830,7 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                 view = BotoneraView()
                 await interaction.followup.send("Selecciona una opción del menú:", view=view, ephemeral=True)
         
-        ubicacion = self.ubicacion_input.value.strip() if self.tipo == "añadir" else None
-        view = SeleccionObjetoView(resultados, cantidad, self.tipo, ubicacion)
+        view = SeleccionObjetoView(resultados, cantidad, self.tipo)
         
         # Crear mensaje con los resultados
         mensaje = f"🔍 **Resultados para '{termino_busqueda}'** ({len(resultados)} encontrados):\n\n"
@@ -819,7 +856,6 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
     async def procesar_añadir(self, interaction, objeto, cantidad):
         nombre = objeto['nombre']
         categoria = objeto['categoria']
-        ubicacion = self.ubicacion_input.value.strip()
         
         # Verificar si el objeto ya existe en categorías
         categoria_existente = get_categoria(nombre)
@@ -860,7 +896,7 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
         update_registro_usuario(interaction.user.id, nombre, cantidad_usuario_actual + cantidad_posible)
         
         # Registrar en historial
-        add_historial(interaction.user.id, "Añadido", nombre, cantidad_posible, ubicacion)
+        add_historial(interaction.user.id, "Añadido", nombre, cantidad_posible)
         
         # Calcular y actualizar reputación
         ganado = calcular_reputacion(categoria_existente, cantidad_posible)
@@ -868,7 +904,7 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
         update_reputacion(interaction.user.id, reputacion_actual + ganado)
         add_historial(interaction.user.id, "Ganó Reputación", "Reputación", ganado)
         
-        mensaje_respuesta = f"✅ {interaction.user.mention} añadió {cantidad_posible} de {nombre} ({categoria_existente}).\nUbicación registrada en tu historial.\nGanaste **{ganado:.2f}** :ReputacionCorvus:. Total: **{reputacion_actual + ganado:.2f}**"
+        mensaje_respuesta = f"✅ {interaction.user.mention} añadió {cantidad_posible} de {nombre} ({categoria_existente}).\nGanaste **{ganado:.2f}** :ReputacionCorvus:. Total: **{reputacion_actual + ganado:.2f}**"
         if cantidad_posible < cantidad:
             mensaje_respuesta += f"\n⚠️ Solo se pudieron añadir {cantidad_posible} debido al límite de almacenamiento."
         
