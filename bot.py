@@ -2,7 +2,7 @@ import os
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, time
 import re
 import sqlite3
 import json
@@ -548,12 +548,12 @@ async def anunciar_contratos_diario():
     except Exception as e:
         print(f"❌ Error al anunciar contratos: {e}")
 
-@tasks.loop(time=datetime.time(12, 15))
+@tasks.loop(time=time(12, 15))
 async def tarea_limpieza_diaria():
     """Tarea programada para limpiar el canal a las 12:15"""
     await limpiar_canal_diario()
 
-@tasks.loop(time=datetime.time(12, 16))
+@tasks.loop(time=time(12, 16))
 async def tarea_anuncio_diario():
     """Tarea programada para anunciar contratos a las 12:16"""
     await anunciar_contratos_diario()
