@@ -255,9 +255,6 @@ except FileNotFoundError:
 
 def buscar_objetos(termino_busqueda, limite=25):
     """Busca objetos que coincidan con el término de búsqueda usando búsqueda híbrida"""
-    if not sistema_busqueda:
-        return []
-    
     termino = termino_busqueda.lower().strip()
     if not termino:
         return []
@@ -265,37 +262,67 @@ def buscar_objetos(termino_busqueda, limite=25):
     resultados_prefijo = []
     resultados_contenido = []
     
-    for nombre_normalizado, datos in sistema_busqueda.items():
-        nombre_original = datos['nombre_original']
-        nombre_lower = nombre_original.lower()
-        
-        # BÚSQUEDA POR PREFIJO (mayor prioridad)
-        if nombre_lower.startswith(termino):
-            resultados_prefijo.append({
-                'nombre': nombre_original,
-                'categoria': datos['categoria'],
-                'tipo': 'prefijo'
-            })
-        # BÚSQUEDA POR CONTENIDO (menor prioridad)
-        elif termino in nombre_lower:
-            resultados_contenido.append({
-                'nombre': nombre_original,
-                'categoria': datos['categoria'],
-                'tipo': 'contenido'
-            })
+    # BÚSQUEDA EN SISTEMA DE BÚSQUEDA (JSON)
+    if sistema_busqueda:
+        for nombre_normalizado, datos in sistema_busqueda.items():
+            nombre_original = datos['nombre_original']
+            nombre_lower = nombre_original.lower()
+            
+            # BÚSQUEDA POR PREFIJO (mayor prioridad)
+            if nombre_lower.startswith(termino):
+                resultados_prefijo.append({
+                    'nombre': nombre_original,
+                    'categoria': datos['categoria'],
+                    'tipo': 'prefijo'
+                })
+            # BÚSQUEDA POR CONTENIDO (menor prioridad)
+            elif termino in nombre_lower:
+                resultados_contenido.append({
+                    'nombre': nombre_original,
+                    'categoria': datos['categoria'],
+                    'tipo': 'contenido'
+                })
+    
+    # BÚSQUEDA EN CATEGORÍAS ESTÁTICAS
+    for categoria, items in categorias.items():
+        for item in items:
+            item_lower = item.lower()
+            
+            # BÚSQUEDA POR PREFIJO (mayor prioridad)
+            if item_lower.startswith(termino):
+                resultados_prefijo.append({
+                    'nombre': item,
+                    'categoria': categoria,
+                    'tipo': 'prefijo'
+                })
+            # BÚSQUEDA POR CONTENIDO (menor prioridad)
+            elif termino in item_lower:
+                resultados_contenido.append({
+                    'nombre': item,
+                    'categoria': categoria,
+                    'tipo': 'contenido'
+                })
     
     # Combinar resultados: prefijos primero, luego contenido
     resultados = resultados_prefijo + resultados_contenido
     
+    # Eliminar duplicados basándose en el nombre
+    resultados_unicos = []
+    nombres_vistos = set()
+    for resultado in resultados:
+        if resultado['nombre'] not in nombres_vistos:
+            resultados_unicos.append(resultado)
+            nombres_vistos.add(resultado['nombre'])
+    
     # Ordenar por relevancia adicional (coincidencias exactas primero)
-    resultados.sort(key=lambda x: (
+    resultados_unicos.sort(key=lambda x: (
         x['tipo'] == 'prefijo',  # Prefijos primero
         x['nombre'].lower() == termino,  # Coincidencias exactas
         x['nombre'].lower().startswith(termino),  # Prefijos
         len(x['nombre'])  # Nombres más cortos primero
     ), reverse=True)
     
-    return resultados[:limite]
+    return resultados_unicos[:limite]
 
 def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
     """Busca objetos que coincidan con el término de búsqueda y que estén en el inventario del usuario usando búsqueda híbrida"""
@@ -686,13 +713,8 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
             await interaction.response.send_message(f"❌ No se encontraron objetos que coincidan con '{termino_busqueda}'. Verifica el nombre o intenta con un término más general.", ephemeral=True)
             return
         
-        # Si hay muchos resultados, mostrar selección
-        if len(resultados) > 1:
-            await self.mostrar_seleccion(interaction, resultados, cantidad)
-        else:
-            # Un solo resultado, procesar directamente
-            objeto_seleccionado = resultados[0]
-            await self.procesar_objeto(interaction, objeto_seleccionado, cantidad)
+        # Siempre mostrar selección para que el usuario confirme
+        await self.mostrar_seleccion(interaction, resultados, cantidad)
     
     async def mostrar_seleccion(self, interaction, resultados, cantidad):
         # Obtener el término de búsqueda del input
