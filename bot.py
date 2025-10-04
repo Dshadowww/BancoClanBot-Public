@@ -385,7 +385,7 @@ iconos = {
 
 categorias = {
     "Consumibles": ["alimentos", "agua", "pepinos"],
-    "Minerales y materiales": ["scu iron","agricium","aluminium","aphorite","bexalite","borase","copper","corundum","diamond","dolivine","gold","hadanite","laranite","levskiite","quantanium","taranite","titanium","zetaprolium"],
+    "Minerales y materiales": ["scu iron","agricium","aluminium","aphorite","bexalite","borase","copper","corundum","diamond","dolivine","gold","hadanite","laranite","levskiite","quantanium","taranite","titanium","zetaprolium","medical supplies"],
     "Armas": ["p4-ar","p5-ar","p6-ar","p7-ar","p8-ar","p8","arclight","lh86","s-38","br-2","devastator","f55","fs-9","demeco","scourge","salvo frag"],
     "Armaduras": ["armaduras corvus","armadura ligera","armadura media","armadura pesada","armadura radiación","armadura calor","armadura frío"],
     "Medicinas": ["medpen"],
@@ -713,11 +713,13 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                         custom_id=f"select_{i}"
                     )
                     
-                    # Crear callback específico para este botón
-                    async def button_callback(interaction, obj=resultado):
-                        await self.seleccionar_objeto(interaction, obj)
+                    # Crear callback específico para este botón con closure correcto
+                    def make_callback(obj):
+                        async def button_callback(interaction):
+                            await self.seleccionar_objeto(interaction, obj)
+                        return button_callback
                     
-                    button.callback = button_callback
+                    button.callback = make_callback(resultado)
                     self.add_item(button)
             
             async def seleccionar_objeto(self, interaction, objeto):
