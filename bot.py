@@ -306,13 +306,15 @@ def buscar_objetos(termino_busqueda, limite=25):
     # Combinar resultados: prefijos primero, luego contenido
     resultados = resultados_prefijo + resultados_contenido
     
-    # Eliminar duplicados basándose en el nombre
+    # Eliminar duplicados basándose en el nombre normalizado
     resultados_unicos = []
     nombres_vistos = set()
     for resultado in resultados:
-        if resultado['nombre'] not in nombres_vistos:
+        # Normalizar nombre para comparación (minúsculas y sin espacios extra)
+        nombre_normalizado = resultado['nombre'].lower().strip()
+        if nombre_normalizado not in nombres_vistos:
             resultados_unicos.append(resultado)
-            nombres_vistos.add(resultado['nombre'])
+            nombres_vistos.add(nombre_normalizado)
     
     # Ordenar por relevancia adicional (coincidencias exactas primero)
     resultados_unicos.sort(key=lambda x: (
@@ -368,15 +370,25 @@ def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
     # Combinar resultados: prefijos primero, luego contenido
     resultados = resultados_prefijo + resultados_contenido
     
+    # Eliminar duplicados basándose en el nombre normalizado
+    resultados_unicos = []
+    nombres_vistos = set()
+    for resultado in resultados:
+        # Normalizar nombre para comparación (minúsculas y sin espacios extra)
+        nombre_normalizado = resultado['nombre'].lower().strip()
+        if nombre_normalizado not in nombres_vistos:
+            resultados_unicos.append(resultado)
+            nombres_vistos.add(nombre_normalizado)
+    
     # Ordenar por relevancia adicional (coincidencias exactas primero)
-    resultados.sort(key=lambda x: (
+    resultados_unicos.sort(key=lambda x: (
         x['tipo'] == 'prefijo',  # Prefijos primero
         x['nombre'].lower() == termino,  # Coincidencias exactas
         x['nombre'].lower().startswith(termino),  # Prefijos
         len(x['nombre'])  # Nombres más cortos primero
     ), reverse=True)
     
-    return resultados[:limite]
+    return resultados_unicos[:limite]
 
 def obtener_categoria_objeto(nombre_objeto):
     """Obtiene la categoría de un objeto usando el sistema de búsqueda"""
