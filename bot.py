@@ -548,12 +548,12 @@ async def anunciar_contratos_diario():
     except Exception as e:
         print(f"❌ Error al anunciar contratos: {e}")
 
-@tasks.loop(hours=24)
+@tasks.loop(time=datetime.time(hour=12, minute=0))
 async def tarea_limpieza_diaria():
     """Tarea programada para limpiar el canal a las 12:00"""
     await limpiar_canal_diario()
 
-@tasks.loop(hours=24)
+@tasks.loop(time=datetime.time(hour=12, minute=1))
 async def tarea_anuncio_diario():
     """Tarea programada para anunciar contratos a las 12:01"""
     await anunciar_contratos_diario()
