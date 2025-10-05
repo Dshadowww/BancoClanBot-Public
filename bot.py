@@ -7,6 +7,9 @@ import re
 import sqlite3
 import json
 import asyncio
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from supabase_config import get_supabase_client, get_db_connection_string
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -21,6 +24,10 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # Sistema de backup automático
 DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
+
+# Configuración de Supabase
+SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
+USE_SUPABASE = os.getenv("USE_SUPABASE", "false").lower() == "true"
 
 # Importar y ejecutar backup al inicio
 try:
@@ -42,9 +49,28 @@ DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
 
+def get_db_connection():
+    """Obtiene conexión a la base de datos (SQLite o PostgreSQL)"""
+    if USE_SUPABASE and SUPABASE_DB_PASSWORD:
+        try:
+            conn = psycopg2.connect(
+                host="db.rdjpemonawhnuspkkeic.supabase.co",
+                port=5432,
+                database="postgres",
+                user="postgres",
+                password=SUPABASE_DB_PASSWORD
+            )
+            return conn
+        except Exception as e:
+            print(f"⚠️ Error conectando a Supabase: {e}")
+            print("🔄 Fallback a SQLite...")
+    
+    # Fallback a SQLite
+    return sqlite3.connect(DB_FILE)
+
 def init_database():
     """Inicializa la base de datos y crea las tablas si no existen"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Tabla para el inventario global
@@ -110,7 +136,7 @@ def init_database():
 
 def get_inventario():
     """Obtiene el inventario completo desde la base de datos"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT item, cantidad FROM inventario")
     inventario = dict(cursor.fetchall())
@@ -119,7 +145,7 @@ def get_inventario():
 
 def get_registro_usuario(user_id):
     """Obtiene el registro de un usuario específico"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT item, cantidad FROM registro_usuarios WHERE user_id = ?", (user_id,))
     registro = dict(cursor.fetchall())
