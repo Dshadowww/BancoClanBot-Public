@@ -444,7 +444,7 @@ iconos = {
     "f55": "🔫", "fs-9": "🔫", "demeco": "🔫", "scourge": "🔫", "salvo frag": "🔫",
     "armaduras corvus": "🛡️", "armadura ligera": "🛡️", "armadura media": "🛡️",
     "armadura pesada": "🛡️", "armadura radiación": "☢️", "armadura calor": "🔥", "armadura frío": "❄️",
-    "alimentos": "🍽️", "agua": "🥤", "medpen": "💊"
+    "alimentos": "🍽️", "agua": "🥤", "medpen": "💊", "medpen (hemozal)": "💊", "medical supplies": "🏥"
 }
 
 categorias = {
@@ -452,7 +452,7 @@ categorias = {
     "Minerales y materiales": ["scu iron","agricium","agricium (raw)","agricium (scu)","aluminium","aluminium (raw)","aluminium (scu)","aphorite","aphorite (raw)","aphorite (scu)","bexalite","bexalite (raw)","bexalite (scu)","borase","borase (raw)","borase (scu)","copper","copper (raw)","copper (scu)","corundum","corundum (raw)","corundum (scu)","diamond","diamond (raw)","diamond (scu)","dolivine","dolivine (raw)","dolivine (scu)","gold","gold (raw)","gold (scu)","hadanite","hadanite (raw)","hadanite (scu)","laranite","laranite (raw)","laranite (scu)","levskiite","levskiite (raw)","levskiite (scu)","quantainium","quantainium (raw)","quantainium (scu)","taranite","taranite (raw)","taranite (scu)","titanium","titanium (raw)","titanium (scu)","zetaprolium","zetaprolium (raw)","zetaprolium (scu)","medical supplies"],
     "Armas": ["p4-ar","p5-ar","p6-ar","p7-ar","p8-ar","p8","arclight","lh86","s-38","br-2","devastator","f55","fs-9","demeco","scourge","salvo frag"],
     "Armaduras": ["armaduras corvus","armadura ligera","armadura media","armadura pesada","armadura radiación","armadura calor","armadura frío"],
-    "Medicinas": ["medpen"],
+    "Medicinas": ["medpen", "medpen (hemozal)", "medical supplies"],
     "Otros": []
 }
 
