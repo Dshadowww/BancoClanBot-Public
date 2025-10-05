@@ -24,18 +24,20 @@ DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
 
 # Importar y ejecutar backup al inicio
 try:
-    from backup_db import backup_database, restore_database
-    print("🔄 Verificando sistema de backup...")
+    from backup_github import backup_to_github, restore_from_github, sync_with_github
+    print("🔄 Verificando sistema de backup GitHub...")
+    # Sincronizar con GitHub
+    sync_with_github()
     # Intentar restaurar backup previo
-    if restore_database():
-        print("✅ Base de datos restaurada desde backup")
+    if restore_from_github():
+        print("✅ Base de datos restaurada desde backup GitHub")
     else:
         print("ℹ️ No hay backup previo, creando nueva base de datos")
     # Crear nuevo backup
-    backup_database()
-    print("✅ Sistema de backup inicializado correctamente")
+    backup_to_github()
+    print("✅ Sistema de backup GitHub inicializado correctamente")
 except Exception as e:
-    print(f"⚠️ Error en sistema de backup: {e}")
+    print(f"⚠️ Error en sistema de backup GitHub: {e}")
     print("🔄 Continuando sin sistema de backup...")
 
 DB_DIR = os.path.dirname(DB_FILE)
@@ -190,8 +192,8 @@ def add_historial(user_id, accion, item, cantidad, ubicacion=None, usuario_relac
     
     # Crear backup automático después de cada operación
     try:
-        from backup_db import backup_database
-        backup_database()
+        from backup_github import backup_to_github
+        backup_to_github()
     except:
         pass  # No fallar si el backup falla
 
