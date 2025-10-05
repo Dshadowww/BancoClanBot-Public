@@ -270,7 +270,7 @@ def delete_all_contratos():
 # =========================
 # Cargar sistema de búsqueda de objetos
 try:
-    with open('sistema_busqueda_objetos.json', 'r', encoding='utf-8') as f:
+    with open('mega_lista_objetos_completa.json', 'r', encoding='utf-8') as f:
         sistema_busqueda = json.load(f)
     print(f"Sistema de búsqueda cargado con {len(sistema_busqueda)} objetos")
 except FileNotFoundError:
