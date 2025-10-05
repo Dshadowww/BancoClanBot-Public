@@ -7,7 +7,8 @@ import re
 import sqlite3
 import json
 import asyncio
-from supabase_config import get_supabase_client
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -20,11 +21,12 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
-# Sistema de backup automático
-DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
+# Configuración para Heroku con Postgres
+DATABASE_URL = os.getenv("DATABASE_URL")
+USE_POSTGRES = DATABASE_URL is not None
 
-# Configuración de backup mejorado
-BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "true").lower() == "true"
+# Fallback a SQLite si no hay Postgres
+DB_FILE = os.getenv("DB_FILE", "inventario.db")
 
 # Importar y ejecutar backup al inicio
 try:
@@ -47,7 +49,16 @@ if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
 
 def get_db_connection():
-    """Obtiene conexión a la base de datos SQLite"""
+    """Obtiene conexión a la base de datos (Postgres o SQLite)"""
+    if USE_POSTGRES:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            return conn
+        except Exception as e:
+            print(f"⚠️ Error conectando a Postgres: {e}")
+            print("🔄 Fallback a SQLite...")
+    
+    # Fallback a SQLite
     return sqlite3.connect(DB_FILE)
 
 def init_database():
@@ -55,13 +66,22 @@ def init_database():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Tabla para el inventario global
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS inventario (
-            item TEXT PRIMARY KEY,
-            cantidad INTEGER NOT NULL DEFAULT 0
-        )
-    ''')
+    if USE_POSTGRES:
+        # Crear tablas en PostgreSQL
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS inventario (
+                item VARCHAR(255) PRIMARY KEY,
+                cantidad INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
+    else:
+        # Crear tablas en SQLite
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS inventario (
+                item TEXT PRIMARY KEY,
+                cantidad INTEGER NOT NULL DEFAULT 0
+            )
+        ''')
     
     # Tabla para el registro de usuarios (qué tiene cada usuario)
     cursor.execute('''
