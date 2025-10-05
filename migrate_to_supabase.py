@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
-import psycopg2
+import psycopg
 import os
 from supabase_config import get_db_connection_string
 
@@ -14,7 +14,7 @@ def migrate_data():
         sqlite_cursor = sqlite_conn.cursor()
         
         # Conectar a PostgreSQL
-        pg_conn = psycopg2.connect(
+        pg_conn = psycopg.connect(
             host="db.rdjpemonawhnuspkkeic.supabase.co",
             port=5432,
             database="postgres",

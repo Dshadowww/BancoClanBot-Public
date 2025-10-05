@@ -7,8 +7,8 @@ import re
 import sqlite3
 import json
 import asyncio
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 from supabase_config import get_supabase_client, get_db_connection_string
 
 load_dotenv()
@@ -53,7 +53,7 @@ def get_db_connection():
     """Obtiene conexión a la base de datos (SQLite o PostgreSQL)"""
     if USE_SUPABASE and SUPABASE_DB_PASSWORD:
         try:
-            conn = psycopg2.connect(
+            conn = psycopg.connect(
                 host="db.rdjpemonawhnuspkkeic.supabase.co",
                 port=5432,
                 database="postgres",
