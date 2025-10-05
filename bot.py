@@ -202,6 +202,13 @@ def update_reputacion(user_id, puntos):
     cursor.execute("INSERT OR REPLACE INTO reputacion (user_id, puntos) VALUES (?, ?)", (user_id, puntos))
     conn.commit()
     conn.close()
+    
+    # Crear backup automático después de cada operación
+    try:
+        from backup_simple import backup_database
+        backup_database()
+    except:
+        pass  # No fallar si el backup falla
 
 def get_categoria(item: str):
     """Obtiene la categoría de un item desde DB; si no existe, intenta con categorias estáticas; si no, None."""
@@ -244,6 +251,13 @@ def add_contrato(nombre: str, enlace: str):
     cursor.execute("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)", (nombre, enlace, fecha))
     conn.commit()
     conn.close()
+    
+    # Crear backup automático después de cada operación
+    try:
+        from backup_simple import backup_database
+        backup_database()
+    except:
+        pass  # No fallar si el backup falla
 
 def delete_contrato(nombre: str):
     """Elimina un contrato específico de la base de datos"""
@@ -1563,11 +1577,6 @@ async def borrar_todos_contratos(ctx):
 @bot.command(name="anuncio")
 async def anuncio_contratos(ctx):
     """Anuncia todos los contratos disponibles en el canal de contratos"""
-    # Permitir a cualquier usuario usar el comando
-    # if not ctx.author.guild_permissions.administrator:
-    #     await ctx.send("❌ Solo los administradores pueden usar este comando.")
-    #     return
-    
     try:
         canal_id = os.getenv("CANAL_CONTRATOS_ID")
         if not canal_id:
@@ -1582,9 +1591,9 @@ async def anuncio_contratos(ctx):
         contratos = get_contratos()
         
         if not contratos:
-            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado manualmente**"
+            mensaje = "🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado manualmente**"
         else:
-            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
+            mensaje = "🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
             
             for i, (nombre, enlace) in enumerate(contratos, 1):
                 mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
@@ -1598,5 +1607,28 @@ async def anuncio_contratos(ctx):
         
     except Exception as e:
         await ctx.send(f"❌ Error al enviar anuncio: {e}")
+
+@bot.command(name="anuncio_privado")
+async def anuncio_contratos_privado(ctx):
+    """Envía la lista de contratos por mensaje privado"""
+    try:
+        contratos = get_contratos()
+        
+        if not contratos:
+            mensaje = "🔄 ** CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**"
+        else:
+            mensaje = "🔄 ** CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
+            
+            for i, (nombre, enlace) in enumerate(contratos, 1):
+                mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
+            
+            mensaje += f"---\n💼 **Total de contratos activos: {len(contratos)}**"
+        
+        # Enviar por mensaje privado
+        await ctx.author.send(mensaje)
+        await ctx.send("✅ Lista de contratos enviada por mensaje privado.")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Error al enviar mensaje privado: {e}")
 
 bot.run(TOKEN)

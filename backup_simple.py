@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 
 def backup_database():
-    """Crea un backup simple de la base de datos"""
+    """Crea un backup completo de la base de datos"""
     try:
         # Verificar si existe la base de datos
         db_file = "/app/inventario.db"
@@ -27,14 +27,19 @@ def backup_database():
         # Copiar la base de datos
         shutil.copy2(db_file, backup_file)
         
-        # Mantener solo los últimos 5 backups
+        # Crear backup adicional de la BD principal (sin timestamp para restauración rápida)
+        backup_principal = f"{backup_dir}/inventario_principal.db"
+        shutil.copy2(db_file, backup_principal)
+        
+        # Mantener solo los últimos 10 backups (más backups para mayor seguridad)
         backups = [f for f in os.listdir(backup_dir) if f.startswith("inventario_backup_")]
         backups.sort(reverse=True)
         
-        for old_backup in backups[5:]:
+        for old_backup in backups[10:]:
             os.remove(os.path.join(backup_dir, old_backup))
         
-        print(f"✅ Backup creado: {backup_file}")
+        print(f"✅ Backup completo creado: {backup_file}")
+        print(f"✅ Backup principal actualizado: {backup_principal}")
         return True
         
     except Exception as e:
@@ -49,7 +54,14 @@ def restore_database():
             print("⚠️ No hay directorio de backups")
             return False
         
-        # Buscar el backup más reciente
+        # Primero intentar restaurar desde el backup principal
+        backup_principal = os.path.join(backup_dir, "inventario_principal.db")
+        if os.path.exists(backup_principal):
+            shutil.copy2(backup_principal, "/app/inventario.db")
+            print(f"✅ Base de datos restaurada desde backup principal: {backup_principal}")
+            return True
+        
+        # Si no existe el principal, buscar el backup más reciente
         backups = [f for f in os.listdir(backup_dir) if f.startswith("inventario_backup_")]
         if not backups:
             print("⚠️ No hay backups disponibles")
