@@ -19,8 +19,18 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
-# Usar ruta persistente de Railway Volume
-DB_FILE = os.getenv("DB_FILE", "/app/data/inventario.db")
+# Sistema de backup automático
+DB_FILE = os.getenv("DB_FILE", "inventario.db")
+
+# Importar y ejecutar backup al inicio
+try:
+    from backup_db import backup_database, restore_database
+    print("🔄 Verificando sistema de backup...")
+    restore_database()  # Intentar restaurar backup previo
+    backup_database()   # Crear nuevo backup
+except Exception as e:
+    print(f"⚠️ Error en sistema de backup: {e}")
+
 DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
