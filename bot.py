@@ -269,6 +269,11 @@ def buscar_objetos(termino_busqueda, limite=25):
     if not termino:
         return []
     
+    # FILTRO: Bloquear naves y partes de naves
+    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental']
+    if any(termino_bloqueado in termino for termino_bloqueado in terminos_bloqueados):
+        return []
+    
     resultados_prefijo = []
     resultados_contenido = []
     
@@ -343,6 +348,11 @@ def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
     
     termino = termino_busqueda.lower().strip()
     if not termino:
+        return []
+    
+    # FILTRO: Bloquear naves y partes de naves
+    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental']
+    if any(termino_bloqueado in termino for termino_bloqueado in terminos_bloqueados):
         return []
     
     # Obtener objetos del usuario desde la base de datos
@@ -447,8 +457,8 @@ categorias = {
 }
 
 limites = {
-    "default": 50,
-    "Minerales y materiales": 1000
+    "default": 200,
+    "Minerales y materiales": 5000
 }
 
 # =========================
