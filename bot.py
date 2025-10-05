@@ -28,21 +28,8 @@ USE_POSTGRES = DATABASE_URL is not None
 # Fallback a SQLite si no hay Postgres
 DB_FILE = os.getenv("DB_FILE", "inventario.db")
 
-# Importar y ejecutar backup al inicio
-try:
-    from backup_simple import backup_database, restore_database
-    print("🔄 Verificando sistema de backup...")
-    # Intentar restaurar backup previo
-    if restore_database():
-        print("✅ Base de datos restaurada desde backup")
-    else:
-        print("ℹ️ No hay backup previo, creando nueva base de datos")
-    # Crear nuevo backup
-    backup_database()
-    print("✅ Sistema de backup inicializado correctamente")
-except Exception as e:
-    print(f"⚠️ Error en sistema de backup: {e}")
-    print("🔄 Continuando sin sistema de backup...")
+# Inicializar base de datos
+print("🔄 Inicializando base de datos...")
 
 DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
@@ -216,12 +203,7 @@ def add_historial(user_id, accion, item, cantidad, ubicacion=None, usuario_relac
     conn.commit()
     conn.close()
     
-    # Crear backup automático después de cada operación
-    try:
-        from backup_simple import backup_database
-        backup_database()
-    except:
-        pass  # No fallar si el backup falla
+    # Los datos se guardan automáticamente en Postgres
 
 def update_reputacion(user_id, puntos):
     """Actualiza la reputación de un usuario"""
@@ -231,12 +213,7 @@ def update_reputacion(user_id, puntos):
     conn.commit()
     conn.close()
     
-    # Crear backup automático después de cada operación
-    try:
-        from backup_simple import backup_database
-        backup_database()
-    except:
-        pass  # No fallar si el backup falla
+    # Los datos se guardan automáticamente en Postgres
 
 def get_categoria(item: str):
     """Obtiene la categoría de un item desde DB; si no existe, intenta con categorias estáticas; si no, None."""
@@ -280,12 +257,7 @@ def add_contrato(nombre: str, enlace: str):
     conn.commit()
     conn.close()
     
-    # Crear backup automático después de cada operación
-    try:
-        from backup_simple import backup_database
-        backup_database()
-    except:
-        pass  # No fallar si el backup falla
+    # Los datos se guardan automáticamente en Postgres
 
 def delete_contrato(nombre: str):
     """Elimina un contrato específico de la base de datos"""
