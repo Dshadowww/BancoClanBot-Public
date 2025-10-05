@@ -1563,9 +1563,10 @@ async def borrar_todos_contratos(ctx):
 @bot.command(name="anuncio")
 async def anuncio_contratos(ctx):
     """Anuncia todos los contratos disponibles en el canal de contratos"""
-    if not ctx.author.guild_permissions.administrator:
-        await ctx.send("❌ Solo los administradores pueden usar este comando.")
-        return
+    # Permitir a cualquier usuario usar el comando
+    # if not ctx.author.guild_permissions.administrator:
+    #     await ctx.send("❌ Solo los administradores pueden usar este comando.")
+    #     return
     
     try:
         canal_id = os.getenv("CANAL_CONTRATOS_ID")
