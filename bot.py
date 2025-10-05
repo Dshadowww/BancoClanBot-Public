@@ -7,9 +7,7 @@ import re
 import sqlite3
 import json
 import asyncio
-import psycopg
-from psycopg.rows import dict_row
-from supabase_config import get_supabase_client, get_db_connection_string
+from supabase_config import get_supabase_client
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -25,9 +23,8 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # Sistema de backup automático
 DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
 
-# Configuración de Supabase
-SUPABASE_DB_PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
-USE_SUPABASE = os.getenv("USE_SUPABASE", "false").lower() == "true"
+# Configuración de backup mejorado
+BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "true").lower() == "true"
 
 # Importar y ejecutar backup al inicio
 try:
@@ -50,22 +47,7 @@ if DB_DIR and not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR, exist_ok=True)
 
 def get_db_connection():
-    """Obtiene conexión a la base de datos (SQLite o PostgreSQL)"""
-    if USE_SUPABASE and SUPABASE_DB_PASSWORD:
-        try:
-            conn = psycopg.connect(
-                host="db.rdjpemonawhnuspkkeic.supabase.co",
-                port=5432,
-                database="postgres",
-                user="postgres",
-                password=SUPABASE_DB_PASSWORD
-            )
-            return conn
-        except Exception as e:
-            print(f"⚠️ Error conectando a Supabase: {e}")
-            print("🔄 Fallback a SQLite...")
-    
-    # Fallback a SQLite
+    """Obtiene conexión a la base de datos SQLite"""
     return sqlite3.connect(DB_FILE)
 
 def init_database():

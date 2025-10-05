@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 
 def backup_database():
-    """Crea un backup completo de la base de datos"""
+    """Crea un backup completo de la base de datos con múltiples copias"""
     try:
         # Verificar si existe la base de datos
         db_file = "/app/inventario.db"
@@ -20,26 +20,36 @@ def backup_database():
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
         
-        # Nombre del backup con timestamp
+        # Crear múltiples copias de seguridad
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = f"{backup_dir}/inventario_backup_{timestamp}.db"
         
-        # Copiar la base de datos
+        # Backup con timestamp
+        backup_file = f"{backup_dir}/inventario_backup_{timestamp}.db"
         shutil.copy2(db_file, backup_file)
         
-        # Crear backup adicional de la BD principal (sin timestamp para restauración rápida)
+        # Backup principal (siempre el más reciente)
         backup_principal = f"{backup_dir}/inventario_principal.db"
         shutil.copy2(db_file, backup_principal)
         
-        # Mantener solo los últimos 10 backups (más backups para mayor seguridad)
+        # Backup de emergencia (cada 5 minutos)
+        backup_emergency = f"{backup_dir}/inventario_emergency.db"
+        shutil.copy2(db_file, backup_emergency)
+        
+        # Backup diario
+        backup_daily = f"{backup_dir}/inventario_daily_{datetime.now().strftime('%Y%m%d')}.db"
+        shutil.copy2(db_file, backup_daily)
+        
+        # Mantener solo los últimos 20 backups
         backups = [f for f in os.listdir(backup_dir) if f.startswith("inventario_backup_")]
         backups.sort(reverse=True)
         
-        for old_backup in backups[10:]:
+        for old_backup in backups[20:]:
             os.remove(os.path.join(backup_dir, old_backup))
         
         print(f"✅ Backup completo creado: {backup_file}")
         print(f"✅ Backup principal actualizado: {backup_principal}")
+        print(f"✅ Backup de emergencia actualizado: {backup_emergency}")
+        print(f"✅ Backup diario actualizado: {backup_daily}")
         return True
         
     except Exception as e:
