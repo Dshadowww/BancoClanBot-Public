@@ -1560,4 +1560,42 @@ async def borrar_todos_contratos(ctx):
     except Exception as e:
         await ctx.send(f"❌ **Error al eliminar los contratos:** {str(e)}", ephemeral=True)
 
+@bot.command(name="anuncio")
+async def anuncio_contratos(ctx):
+    """Anuncia todos los contratos disponibles en el canal de contratos"""
+    if not ctx.author.guild_permissions.administrator:
+        await ctx.send("❌ Solo los administradores pueden usar este comando.")
+        return
+    
+    try:
+        canal_id = os.getenv("CANAL_CONTRATOS_ID")
+        if not canal_id:
+            await ctx.send("❌ Canal de contratos no configurado.")
+            return
+        
+        canal = bot.get_channel(int(canal_id))
+        if not canal:
+            await ctx.send(f"❌ No se pudo encontrar el canal con ID: {canal_id}")
+            return
+        
+        contratos = get_contratos()
+        
+        if not contratos:
+            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n❌ **No hay contratos disponibles en este momento.**\n\n---\n💼 **Total de contratos activos: 0**\n⏰ **Actualizado manualmente**"
+        else:
+            mensaje = "@here\n🔄 ** ACTUALIZACIÓN DE LOS CONTRATOS DISPONIBLES:** 🔄\n\n**📋 CONTRATOS DISPONIBLES:**\n\n"
+            
+            for i, (nombre, enlace) in enumerate(contratos, 1):
+                mensaje += f"**{i}.** **{nombre}**\n{enlace}\n\n"
+            
+            mensaje += f"---\n💼 **Total de contratos activos: {len(contratos)}**\n⏰ **Actualizado manualmente**"
+        
+        # Enviar mensaje con botonera pública
+        view = BotoneraView()
+        await canal.send(mensaje, view=view)
+        await ctx.send(f"✅ Anuncio enviado al canal {canal.mention}")
+        
+    except Exception as e:
+        await ctx.send(f"❌ Error al enviar anuncio: {e}")
+
 bot.run(TOKEN)
