@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: banco-clan-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - CANAL_CONTRATOS_ID=${CANAL_CONTRATOS_ID}
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_FILE=${DB_FILE}
+    depends_on:
+      - postgres
+    networks:
+      - bot-network
+
+  postgres:
+    image: postgres:15
+    container_name: banco-clan-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=inventario
+      - POSTGRES_USER=bot_user
+      - POSTGRES_PASSWORD=bot_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot-network
+
+volumes:
+  postgres_data:
+
+networks:
+  bot-network:
+    driver: bridge

@@ -21,7 +21,7 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
-# Configuración para Heroku con Postgres
+# Configuración para Oracle Cloud con Postgres
 DATABASE_URL = os.getenv("DATABASE_URL")
 USE_POSTGRES = DATABASE_URL is not None
 
