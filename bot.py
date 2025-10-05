@@ -26,10 +26,17 @@ DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
 try:
     from backup_db import backup_database, restore_database
     print("🔄 Verificando sistema de backup...")
-    restore_database()  # Intentar restaurar backup previo
-    backup_database()   # Crear nuevo backup
+    # Intentar restaurar backup previo
+    if restore_database():
+        print("✅ Base de datos restaurada desde backup")
+    else:
+        print("ℹ️ No hay backup previo, creando nueva base de datos")
+    # Crear nuevo backup
+    backup_database()
+    print("✅ Sistema de backup inicializado correctamente")
 except Exception as e:
     print(f"⚠️ Error en sistema de backup: {e}")
+    print("🔄 Continuando sin sistema de backup...")
 
 DB_DIR = os.path.dirname(DB_FILE)
 if DB_DIR and not os.path.exists(DB_DIR):
@@ -180,6 +187,13 @@ def add_historial(user_id, accion, item, cantidad, ubicacion=None, usuario_relac
                    (user_id, timestamp, accion, item, cantidad, ubicacion, usuario_relacionado))
     conn.commit()
     conn.close()
+    
+    # Crear backup automático después de cada operación
+    try:
+        from backup_db import backup_database
+        backup_database()
+    except:
+        pass  # No fallar si el backup falla
 
 def update_reputacion(user_id, puntos):
     """Actualiza la reputación de un usuario"""
@@ -283,18 +297,25 @@ def buscar_objetos(termino_busqueda, limite=25):
             nombre_original = datos['nombre_original']
             nombre_lower = nombre_original.lower()
             
+            # FILTRO: Normalizar nombres de medicinas para evitar duplicados
+            nombre_normalizado_busqueda = nombre_lower
+            if 'medpen' in nombre_lower and 'hemozal' in nombre_lower:
+                nombre_normalizado_busqueda = 'medpen (hemozal)'
+            elif nombre_lower == 'medpen':
+                nombre_normalizado_busqueda = 'medpen'
+            
             # BÚSQUEDA POR PREFIJO (mayor prioridad)
-            if nombre_lower.startswith(termino):
+            if nombre_normalizado_busqueda.startswith(termino):
                 resultados_prefijo.append({
                     'nombre': nombre_original,
-                    'categoria': datos['categoria'],
+                    'categoria': 'Medicinas' if 'medpen' in nombre_lower else datos['categoria'],
                     'tipo': 'prefijo'
                 })
             # BÚSQUEDA POR CONTENIDO (menor prioridad)
-            elif termino in nombre_lower:
+            elif termino in nombre_normalizado_busqueda:
                 resultados_contenido.append({
                     'nombre': nombre_original,
-                    'categoria': datos['categoria'],
+                    'categoria': 'Medicinas' if 'medpen' in nombre_lower else datos['categoria'],
                     'tipo': 'contenido'
                 })
     
@@ -366,23 +387,30 @@ def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
         nombre_original = datos['nombre_original']
         nombre_lower = nombre_original.lower()
         
+        # FILTRO: Normalizar nombres de medicinas para evitar duplicados
+        nombre_normalizado_busqueda = nombre_lower
+        if 'medpen' in nombre_lower and 'hemozal' in nombre_lower:
+            nombre_normalizado_busqueda = 'medpen (hemozal)'
+        elif nombre_lower == 'medpen':
+            nombre_normalizado_busqueda = 'medpen'
+        
         # Verificar si el usuario tiene este objeto
         if nombre_original in objetos_disponibles:
             cantidad_usuario = inventario_usuario[nombre_original]
             
             # BÚSQUEDA POR PREFIJO (mayor prioridad)
-            if nombre_lower.startswith(termino):
+            if nombre_normalizado_busqueda.startswith(termino):
                 resultados_prefijo.append({
                     'nombre': nombre_original,
-                    'categoria': datos['categoria'],
+                    'categoria': 'Medicinas' if 'medpen' in nombre_lower else datos['categoria'],
                     'cantidad': cantidad_usuario,
                     'tipo': 'prefijo'
                 })
             # BÚSQUEDA POR CONTENIDO (menor prioridad)
-            elif termino in nombre_lower:
+            elif termino in nombre_normalizado_busqueda:
                 resultados_contenido.append({
                     'nombre': nombre_original,
-                    'categoria': datos['categoria'],
+                    'categoria': 'Medicinas' if 'medpen' in nombre_lower else datos['categoria'],
                     'cantidad': cantidad_usuario,
                     'tipo': 'contenido'
                 })
