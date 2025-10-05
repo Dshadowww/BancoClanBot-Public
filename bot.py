@@ -20,7 +20,7 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # CONFIGURACIÓN DE BASE DE DATOS
 # =========================
 # Sistema de backup automático
-DB_FILE = os.getenv("DB_FILE", "inventario.db")
+DB_FILE = os.getenv("DB_FILE", "/app/inventario.db")
 
 # Importar y ejecutar backup al inicio
 try:
@@ -270,7 +270,7 @@ def buscar_objetos(termino_busqueda, limite=25):
         return []
     
     # FILTRO: Bloquear naves y partes de naves
-    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental']
+    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental', 'polaris', 'constellation', 'cutlass', 'freelancer', 'hornet', 'gladius', 'sabre', 'avenger', 'aurora', 'mustang', '300i', '315p', '350r', '100i', '125a', '135c', 'blade', 'glaive', 'scythe', 'hammerhead', 'starfarer', 'retaliator', 'merlin', 'm50', 'scout', 'talisman']
     if any(termino_bloqueado in termino for termino_bloqueado in terminos_bloqueados):
         return []
     
@@ -351,7 +351,7 @@ def buscar_objetos_inventario(termino_busqueda, user_id, limite=25):
         return []
     
     # FILTRO: Bloquear naves y partes de naves
-    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental']
+    terminos_bloqueados = ['ship', 'nave', 'armor', 'ammunition', 'parts', 'dealer', 'rental', 'polaris', 'constellation', 'cutlass', 'freelancer', 'hornet', 'gladius', 'sabre', 'avenger', 'aurora', 'mustang', '300i', '315p', '350r', '100i', '125a', '135c', 'blade', 'glaive', 'scythe', 'hammerhead', 'starfarer', 'retaliator', 'merlin', 'm50', 'scout', 'talisman']
     if any(termino_bloqueado in termino for termino_bloqueado in terminos_bloqueados):
         return []
     

@@ -13,12 +13,13 @@ def backup_database():
     """Crea un backup de la base de datos actual"""
     try:
         # Verificar si existe la base de datos
-        if not os.path.exists("inventario.db"):
+        db_file = "/app/inventario.db"
+        if not os.path.exists(db_file):
             print("⚠️ No existe inventario.db para hacer backup")
             return False
         
         # Crear directorio de backups si no existe
-        backup_dir = "backups"
+        backup_dir = "/app/backups"
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
         
@@ -27,7 +28,7 @@ def backup_database():
         backup_file = f"{backup_dir}/inventario_backup_{timestamp}.db"
         
         # Copiar la base de datos
-        shutil.copy2("inventario.db", backup_file)
+        shutil.copy2(db_file, backup_file)
         
         # Mantener solo los últimos 5 backups
         backups = [f for f in os.listdir(backup_dir) if f.startswith("inventario_backup_")]
@@ -46,7 +47,7 @@ def backup_database():
 def restore_database():
     """Restaura la base de datos desde el backup más reciente"""
     try:
-        backup_dir = "backups"
+        backup_dir = "/app/backups"
         if not os.path.exists(backup_dir):
             print("⚠️ No hay directorio de backups")
             return False
@@ -61,7 +62,7 @@ def restore_database():
         latest_backup = os.path.join(backup_dir, backups[0])
         
         # Restaurar la base de datos
-        shutil.copy2(latest_backup, "inventario.db")
+        shutil.copy2(latest_backup, "/app/inventario.db")
         print(f"✅ Base de datos restaurada desde: {latest_backup}")
         return True
         
