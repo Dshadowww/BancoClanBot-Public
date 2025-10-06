@@ -12,6 +12,8 @@ import re
 import sqlite3
 import json
 import asyncio
+from typing import Optional, Dict, Any
+from flask import request, jsonify  # only used if Flask app is running
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN") or os.getenv("DISCORD_TOKEN")
@@ -20,6 +22,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix="//", intents=intents)
+from keep_alive import keep_alive, app  # reuse Flask app for webhooks
 
 # =========================
 # CONFIGURACIÓN DE BASE DE DATOS
@@ -27,6 +30,7 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # Configuración para Oracle Cloud con Postgres
 DATABASE_URL = os.getenv("DATABASE_URL")
 USE_POSTGRES = DATABASE_URL is not None and psycopg is not None
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 # Fallback a SQLite si no hay Postgres
 DB_FILE = os.getenv("DB_FILE", "inventario.db")
@@ -110,6 +114,12 @@ def init_database():
                 fecha_creacion VARCHAR(32) NOT NULL
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id VARCHAR(64) PRIMARY KEY,
+                received_at VARCHAR(32) NOT NULL
+            )
+        ''')
     else:
         # Crear tablas en SQLite
         cursor.execute('''
@@ -156,6 +166,12 @@ def init_database():
                 nombre TEXT NOT NULL,
                 enlace TEXT NOT NULL,
                 fecha_creacion TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id TEXT PRIMARY KEY,
+                received_at TEXT NOT NULL
             )
         ''')
     
@@ -329,6 +345,103 @@ def delete_all_contratos():
     conn.commit()
     conn.close()
     return deleted_rows
+
+# =========================
+# WEBHOOKS (Flask)
+# =========================
+def _event_already_processed(event_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(adapt_placeholders("SELECT 1 FROM webhook_events WHERE event_id = ?"), (event_id,))
+    exists = cursor.fetchone() is not None
+    conn.close()
+    return exists
+
+def _mark_event_processed(event_id: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(adapt_placeholders("INSERT INTO webhook_events (event_id, received_at) VALUES (?, ?)"), (event_id, ts))
+    conn.commit()
+    conn.close()
+
+def upsert_contrato(nombre: str, enlace: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # intentar update por nombre, si no existe insert
+    cursor.execute(adapt_placeholders("UPDATE contratos SET enlace = ? WHERE nombre = ?"), (enlace, nombre))
+    if cursor.rowcount == 0:
+        fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cursor.execute(adapt_placeholders("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)"), (nombre, enlace, fecha))
+    conn.commit()
+    conn.close()
+
+@app.post("/webhook/contratos")
+def webhook_contratos():
+    if WEBHOOK_SECRET:
+        token = request.headers.get("X-Webhook-Token")
+        if token != WEBHOOK_SECRET:
+            return jsonify({"error": "unauthorized"}), 401
+    try:
+        payload = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "invalid_json"}), 400
+    if not isinstance(payload, dict):
+        return jsonify({"error": "invalid_payload"}), 400
+
+    event_id = payload.get("event_id")
+    event_type = payload.get("type")
+    visibility = payload.get("visibility", "public")
+    data = payload.get("data", {})
+
+    if not event_id or not event_type:
+        return jsonify({"error": "missing_fields"}), 400
+    if _event_already_processed(event_id):
+        return jsonify({"status": "duplicate"}), 409
+    if visibility != "public":
+        _mark_event_processed(event_id)
+        return jsonify({"status": "ignored_private"}), 200
+
+    # Procesar tipos básicos
+    if event_type in ("contract.created", "contract.updated"):
+        nombre = data.get("title") or data.get("name") or "Contrato"
+        enlace = data.get("url") or ""
+        upsert_contrato(nombre, enlace)
+    elif event_type == "contract.completed":
+        # registrar en historial si hay usuario y recompensas
+        user = data.get("user", {})
+        user_id = user.get("discord_id")
+        recompensas = data.get("rewards", {})
+        if user_id and isinstance(recompensas, dict):
+            # reputación
+            rep = float(recompensas.get("reputation", 0) or 0)
+            if rep:
+                actual = get_reputacion_usuario(int(user_id))
+                update_reputacion(int(user_id), actual + rep)
+                add_historial(int(user_id), "Ganó Reputación", "Reputación", rep)
+            # items
+            items = recompensas.get("items", [])
+            if isinstance(items, list):
+                for it in items:
+                    nombre = it.get("name")
+                    cant = int(it.get("quantity", 0) or 0)
+                    if nombre and cant > 0:
+                        inv = get_inventario()
+                        actual = inv.get(nombre, 0)
+                        update_inventario(nombre, actual + cant)
+                        reg = get_registro_usuario(int(user_id))
+                        user_actual = reg.get(nombre, 0)
+                        update_registro_usuario(int(user_id), nombre, user_actual + cant)
+                        add_historial(int(user_id), "Añadido", nombre, cant)
+    elif event_type in ("event.created", "event.updated", "event.completed"):
+        # por ahora no persistimos eventos en tabla, sólo marcamos recibido
+        pass
+    else:
+        _mark_event_processed(event_id)
+        return jsonify({"status": "ignored_unknown_type"}), 200
+
+    _mark_event_processed(event_id)
+    return jsonify({"status": "ok"}), 200
 
 # =========================
 # SISTEMA DE BÚSQUEDA AVANZADA
