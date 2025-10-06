@@ -1,4 +1,9 @@
 import os
+try:
+    # psycopg v3
+    import psycopg  # type: ignore
+except Exception:
+    psycopg = None
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -7,11 +12,9 @@ import re
 import sqlite3
 import json
 import asyncio
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.getenv("TOKEN") or os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -23,7 +26,7 @@ bot = commands.Bot(command_prefix="//", intents=intents)
 # =========================
 # Configuración para Oracle Cloud con Postgres
 DATABASE_URL = os.getenv("DATABASE_URL")
-USE_POSTGRES = DATABASE_URL is not None
+USE_POSTGRES = DATABASE_URL is not None and psycopg is not None
 
 # Fallback a SQLite si no hay Postgres
 DB_FILE = os.getenv("DB_FILE", "inventario.db")
@@ -39,7 +42,7 @@ def get_db_connection():
     """Obtiene conexión a la base de datos (Postgres o SQLite)"""
     if USE_POSTGRES:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
+            conn = psycopg.connect(DATABASE_URL)
             return conn
         except Exception as e:
             print(f"⚠️ Error conectando a Postgres: {e}")
@@ -47,6 +50,12 @@ def get_db_connection():
     
     # Fallback a SQLite
     return sqlite3.connect(DB_FILE)
+
+def adapt_placeholders(query: str) -> str:
+    """Adapta los placeholders SQLite ('?') a Postgres ('%s') cuando aplique."""
+    if USE_POSTGRES:
+        return query.replace("?", "%s")
+    return query
 
 def init_database():
     """Inicializa la base de datos y crea las tablas si no existen"""
@@ -61,6 +70,46 @@ def init_database():
                 cantidad INTEGER NOT NULL DEFAULT 0
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS registro_usuarios (
+                user_id BIGINT,
+                item VARCHAR(255),
+                cantidad INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, item)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS historial (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                timestamp VARCHAR(32),
+                accion VARCHAR(64),
+                item VARCHAR(255),
+                cantidad DOUBLE PRECISION,
+                ubicacion VARCHAR(255),
+                usuario_relacionado VARCHAR(255)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reputacion (
+                user_id BIGINT PRIMARY KEY,
+                puntos DOUBLE PRECISION NOT NULL DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS item_categoria (
+                item VARCHAR(255) PRIMARY KEY,
+                categoria VARCHAR(255) NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS contratos (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL,
+                enlace TEXT NOT NULL,
+                fecha_creacion VARCHAR(32) NOT NULL
+            )
+        ''')
     else:
         # Crear tablas en SQLite
         cursor.execute('''
@@ -69,56 +118,46 @@ def init_database():
                 cantidad INTEGER NOT NULL DEFAULT 0
             )
         ''')
-    
-    # Tabla para el registro de usuarios (qué tiene cada usuario)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS registro_usuarios (
-            user_id INTEGER,
-            item TEXT,
-            cantidad INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY (user_id, item)
-        )
-    ''')
-    
-    # Tabla para el historial de operaciones
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS historial (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            timestamp TEXT,
-            accion TEXT,
-            item TEXT,
-            cantidad REAL,
-            ubicacion TEXT,
-            usuario_relacionado TEXT
-        )
-    ''')
-    
-    # Tabla para la reputación
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS reputacion (
-            user_id INTEGER PRIMARY KEY,
-            puntos REAL NOT NULL DEFAULT 0
-        )
-    ''')
-    
-    # Tabla para categorías asignadas dinámicamente a items
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS item_categoria (
-            item TEXT PRIMARY KEY,
-            categoria TEXT NOT NULL
-        )
-    ''')
-    
-    # Tabla para contratos dinámicos
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS contratos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            enlace TEXT NOT NULL,
-            fecha_creacion TEXT NOT NULL
-        )
-    ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS registro_usuarios (
+                user_id INTEGER,
+                item TEXT,
+                cantidad INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, item)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS historial (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                timestamp TEXT,
+                accion TEXT,
+                item TEXT,
+                cantidad REAL,
+                ubicacion TEXT,
+                usuario_relacionado TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reputacion (
+                user_id INTEGER PRIMARY KEY,
+                puntos REAL NOT NULL DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS item_categoria (
+                item TEXT PRIMARY KEY,
+                categoria TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS contratos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT NOT NULL,
+                enlace TEXT NOT NULL,
+                fecha_creacion TEXT NOT NULL
+            )
+        ''')
     
     conn.commit()
     conn.close()
@@ -136,32 +175,32 @@ def get_registro_usuario(user_id):
     """Obtiene el registro de un usuario específico"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT item, cantidad FROM registro_usuarios WHERE user_id = ?", (user_id,))
+    cursor.execute(adapt_placeholders("SELECT item, cantidad FROM registro_usuarios WHERE user_id = ?"), (user_id,))
     registro = dict(cursor.fetchall())
     conn.close()
     return registro
 
 def get_historial_usuario(user_id):
     """Obtiene el historial de un usuario específico"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT timestamp, accion, item, cantidad, ubicacion, usuario_relacionado FROM historial WHERE user_id = ? ORDER BY id", (user_id,))
+    cursor.execute(adapt_placeholders("SELECT timestamp, accion, item, cantidad, ubicacion, usuario_relacionado FROM historial WHERE user_id = ? ORDER BY id"), (user_id,))
     historial = cursor.fetchall()
     conn.close()
     return historial
 
 def get_reputacion_usuario(user_id):
     """Obtiene la reputación de un usuario específico"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT puntos FROM reputacion WHERE user_id = ?", (user_id,))
+    cursor.execute(adapt_placeholders("SELECT puntos FROM reputacion WHERE user_id = ?"), (user_id,))
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else 0
 
 def get_all_reputacion():
     """Obtiene toda la reputación de todos los usuarios"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, puntos FROM reputacion")
     reputacion = dict(cursor.fetchall())
@@ -170,15 +209,18 @@ def get_all_reputacion():
 
 def update_inventario(item, cantidad):
     """Actualiza la cantidad de un item en el inventario"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO inventario (item, cantidad) VALUES (?, ?)", (item, cantidad))
+    # Upsert compatible: intentar update, si no, insert
+    cursor.execute(adapt_placeholders("UPDATE inventario SET cantidad = ? WHERE item = ?"), (cantidad, item))
+    if cursor.rowcount == 0:
+        cursor.execute(adapt_placeholders("INSERT INTO inventario (item, cantidad) VALUES (?, ?)"), (item, cantidad))
     conn.commit()
     conn.close()
 
 def update_registro_usuario(user_id, item, cantidad):
     """Actualiza el registro de un usuario para un item específico"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Prevenir cantidades negativas
@@ -186,19 +228,22 @@ def update_registro_usuario(user_id, item, cantidad):
     
     # Si la cantidad es 0, eliminar el registro en lugar de guardarlo
     if cantidad_final == 0:
-        cursor.execute("DELETE FROM registro_usuarios WHERE user_id = ? AND item = ?", (user_id, item))
+        cursor.execute(adapt_placeholders("DELETE FROM registro_usuarios WHERE user_id = ? AND item = ?"), (user_id, item))
     else:
-        cursor.execute("INSERT OR REPLACE INTO registro_usuarios (user_id, item, cantidad) VALUES (?, ?, ?)", (user_id, item, cantidad_final))
+        # Upsert manual: update, si no existe insert
+        cursor.execute(adapt_placeholders("UPDATE registro_usuarios SET cantidad = ? WHERE user_id = ? AND item = ?"), (cantidad_final, user_id, item))
+        if cursor.rowcount == 0:
+            cursor.execute(adapt_placeholders("INSERT INTO registro_usuarios (user_id, item, cantidad) VALUES (?, ?, ?)"), (user_id, item, cantidad_final))
     
     conn.commit()
     conn.close()
 
 def add_historial(user_id, accion, item, cantidad, ubicacion=None, usuario_relacionado=None):
     """Añade una entrada al historial"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cursor.execute("INSERT INTO historial (user_id, timestamp, accion, item, cantidad, ubicacion, usuario_relacionado) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+    cursor.execute(adapt_placeholders("INSERT INTO historial (user_id, timestamp, accion, item, cantidad, ubicacion, usuario_relacionado) VALUES (?, ?, ?, ?, ?, ?, ?)"), 
                    (user_id, timestamp, accion, item, cantidad, ubicacion, usuario_relacionado))
     conn.commit()
     conn.close()
@@ -207,9 +252,12 @@ def add_historial(user_id, accion, item, cantidad, ubicacion=None, usuario_relac
 
 def update_reputacion(user_id, puntos):
     """Actualiza la reputación de un usuario"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO reputacion (user_id, puntos) VALUES (?, ?)", (user_id, puntos))
+    # Upsert manual
+    cursor.execute(adapt_placeholders("UPDATE reputacion SET puntos = ? WHERE user_id = ?"), (puntos, user_id))
+    if cursor.rowcount == 0:
+        cursor.execute(adapt_placeholders("INSERT INTO reputacion (user_id, puntos) VALUES (?, ?)"), (user_id, puntos))
     conn.commit()
     conn.close()
     
@@ -218,9 +266,9 @@ def update_reputacion(user_id, puntos):
 def get_categoria(item: str):
     """Obtiene la categoría de un item desde DB; si no existe, intenta con categorias estáticas; si no, None."""
     item_norm = item.lower()
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT categoria FROM item_categoria WHERE item = ?", (item_norm,))
+    cursor.execute(adapt_placeholders("SELECT categoria FROM item_categoria WHERE item = ?"), (item_norm,))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -233,15 +281,18 @@ def get_categoria(item: str):
 
 def set_categoria(item: str, categoria: str):
     """Guarda/actualiza la categoría de un item en DB."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO item_categoria (item, categoria) VALUES (?, ?)", (item.lower(), categoria))
+    # Upsert manual
+    cursor.execute(adapt_placeholders("UPDATE item_categoria SET categoria = ? WHERE item = ?"), (categoria, item.lower()))
+    if cursor.rowcount == 0:
+        cursor.execute(adapt_placeholders("INSERT INTO item_categoria (item, categoria) VALUES (?, ?)"), (item.lower(), categoria))
     conn.commit()
     conn.close()
 
 def get_contratos():
     """Obtiene todos los contratos almacenados"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT nombre, enlace FROM contratos ORDER BY id")
     contratos = cursor.fetchall()
@@ -250,10 +301,10 @@ def get_contratos():
 
 def add_contrato(nombre: str, enlace: str):
     """Añade un nuevo contrato a la base de datos"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     fecha = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    cursor.execute("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)", (nombre, enlace, fecha))
+    cursor.execute(adapt_placeholders("INSERT INTO contratos (nombre, enlace, fecha_creacion) VALUES (?, ?, ?)"), (nombre, enlace, fecha))
     conn.commit()
     conn.close()
     
@@ -261,9 +312,9 @@ def add_contrato(nombre: str, enlace: str):
 
 def delete_contrato(nombre: str):
     """Elimina un contrato específico de la base de datos"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM contratos WHERE nombre = ?", (nombre,))
+    cursor.execute(adapt_placeholders("DELETE FROM contratos WHERE nombre = ?"), (nombre,))
     deleted_rows = cursor.rowcount
     conn.commit()
     conn.close()
@@ -271,7 +322,7 @@ def delete_contrato(nombre: str):
 
 def delete_all_contratos():
     """Elimina todos los contratos de la base de datos"""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM contratos")
     deleted_rows = cursor.rowcount
@@ -1427,9 +1478,9 @@ class BotoneraView(discord.ui.View):
                 limite_item = obtener_limite(item)
                 detalles = []
                 # Obtener todos los usuarios que tienen este item
-                conn = sqlite3.connect(DB_FILE)
+                conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT user_id, cantidad FROM registro_usuarios WHERE item = ? AND cantidad > 0", (item,))
+                cursor.execute(adapt_placeholders("SELECT user_id, cantidad FROM registro_usuarios WHERE item = ? AND cantidad > 0"), (item,))
                 usuarios_item = cursor.fetchall()
                 conn.close()
                 for uid, cant in usuarios_item:
@@ -1630,5 +1681,12 @@ async def anuncio_contratos_privado(ctx):
         
     except Exception as e:
         await ctx.send(f"❌ Error al enviar mensaje privado: {e}")
-
+ 
+if os.getenv("KEEP_ALIVE"):
+    try:
+        from keep_alive import keep_alive
+        print("🚀 Activando keep-alive...")
+        keep_alive()
+    except Exception as _e:
+        print("ℹ️ KEEP_ALIVE habilitado pero no se pudo iniciar keep_alive. Continuando sin él.")
 bot.run(TOKEN)
