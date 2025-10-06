@@ -349,6 +349,15 @@ def delete_all_contratos():
 # =========================
 # WEBHOOKS (Flask)
 # =========================
+async def limpiar_y_anunciar():
+    try:
+        await limpiar_canal_diario()
+    except Exception:
+        pass
+    try:
+        await anunciar_contratos_diario()
+    except Exception:
+        pass
 def _event_already_processed(event_id: str) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -441,6 +450,11 @@ def webhook_contratos():
         return jsonify({"status": "ignored_unknown_type"}), 200
 
     _mark_event_processed(event_id)
+    # lanzar anuncio auto: limpiar canal y publicar lista
+    try:
+        asyncio.run_coroutine_threadsafe(limpiar_y_anunciar(), bot.loop)
+    except Exception:
+        pass
     return jsonify({"status": "ok"}), 200
 
 # =========================
