@@ -1039,15 +1039,19 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                     # Mapear categorías del sistema de búsqueda a categorías del bot
                     mapeo_categorias = {
                         'ARMAS': 'Armas',
-                        'MUNICION': 'Armas',  # La munición va con las armas
+                        'MUNICION': 'Armas',      # sin tilde
+                        'MUNICIÓN': 'Armas',      # con tilde
                         'CONSUMIBLES': 'Consumibles',
                         'MINERALES': 'Minerales y materiales',
+                        'ARMADURA': 'Armaduras',  # singular
+                        'ARMADURAS': 'Armaduras', # plural
+                        'MEDICINA': 'Medicinas',  # singular
+                        'MEDICINAS': 'Medicinas', # plural
                         'ROPA': 'Otros',
-                        'ARMADURAS': 'Armaduras',
                         'OTROS': 'Otros'
                     }
-                    
-                    categoria_bot = mapeo_categorias.get(categoria, 'Otros')
+                    categoria_key = (categoria or '').strip().upper()
+                    categoria_bot = mapeo_categorias.get(categoria_key, 'Otros')
                     set_categoria(nombre, categoria_bot)
                     categoria_existente = categoria_bot
                 
