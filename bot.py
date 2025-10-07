@@ -1035,23 +1035,23 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
                 categoria_existente = get_categoria(nombre)
                 
                 # Si no existe, usar la categoría del sistema de búsqueda
-                if not categoria_existente:
-                    # Mapear categorías del sistema de búsqueda a categorías del bot
-                    mapeo_categorias = {
-                        'ARMAS': 'Armas',
-                        'MUNICION': 'Armas',      # sin tilde
-                        'MUNICIÓN': 'Armas',      # con tilde
-                        'CONSUMIBLES': 'Consumibles',
-                        'MINERALES': 'Minerales y materiales',
-                        'ARMADURA': 'Armaduras',  # singular
-                        'ARMADURAS': 'Armaduras', # plural
-                        'MEDICINA': 'Medicinas',  # singular
-                        'MEDICINAS': 'Medicinas', # plural
-                        'ROPA': 'Otros',
-                        'OTROS': 'Otros'
-                    }
-                    categoria_key = (categoria or '').strip().upper()
-                    categoria_bot = mapeo_categorias.get(categoria_key, 'Otros')
+                # Mapear categorías del sistema de búsqueda a categorías del bot (autocorrección)
+                mapeo_categorias = {
+                    'ARMAS': 'Armas',
+                    'MUNICION': 'Armas',      # sin tilde
+                    'MUNICIÓN': 'Armas',      # con tilde
+                    'CONSUMIBLES': 'Consumibles',
+                    'MINERALES': 'Minerales y materiales',
+                    'ARMADURA': 'Armaduras',  # singular
+                    'ARMADURAS': 'Armaduras', # plural
+                    'MEDICINA': 'Medicinas',  # singular
+                    'MEDICINAS': 'Medicinas', # plural
+                    'ROPA': 'Otros',
+                    'OTROS': 'Otros'
+                }
+                categoria_key = (categoria or '').strip().upper()
+                categoria_bot = mapeo_categorias.get(categoria_key, 'Otros')
+                if (not categoria_existente or categoria_existente == 'Otros') and categoria_bot != 'Otros':
                     set_categoria(nombre, categoria_bot)
                     categoria_existente = categoria_bot
                 
@@ -1148,24 +1148,23 @@ class BusquedaObjetoModal(discord.ui.Modal, title="Buscar Objeto"):
         # Verificar si el objeto ya existe en categorías
         categoria_existente = get_categoria(nombre)
         
-        # Si no existe, usar la categoría del sistema de búsqueda
-        if not categoria_existente:
-            # Mapear categorías del sistema de búsqueda a categorías del bot
-            mapeo_categorias = {
-                'ARMAS': 'Armas',
-                'MUNICION': 'Armas',      # sin tilde
-                'MUNICIÓN': 'Armas',      # con tilde
-                'CONSUMIBLES': 'Consumibles',
-                'MINERALES': 'Minerales y materiales',
-                'ARMADURA': 'Armaduras',  # singular
-                'ARMADURAS': 'Armaduras', # plural
-                'MEDICINA': 'Medicinas',  # singular
-                'MEDICINAS': 'Medicinas', # plural
-                'ROPA': 'Otros',
-                'OTROS': 'Otros'
-            }
-            categoria_key = (categoria or '').strip().upper()
-            categoria_bot = mapeo_categorias.get(categoria_key, 'Otros')
+        # Mapear categorías del sistema de búsqueda a categorías del bot (autocorrección)
+        mapeo_categorias = {
+            'ARMAS': 'Armas',
+            'MUNICION': 'Armas',      # sin tilde
+            'MUNICIÓN': 'Armas',      # con tilde
+            'CONSUMIBLES': 'Consumibles',
+            'MINERALES': 'Minerales y materiales',
+            'ARMADURA': 'Armaduras',  # singular
+            'ARMADURAS': 'Armaduras', # plural
+            'MEDICINA': 'Medicinas',  # singular
+            'MEDICINAS': 'Medicinas', # plural
+            'ROPA': 'Otros',
+            'OTROS': 'Otros'
+        }
+        categoria_key = (categoria or '').strip().upper()
+        categoria_bot = mapeo_categorias.get(categoria_key, 'Otros')
+        if (not categoria_existente or categoria_existente == 'Otros') and categoria_bot != 'Otros':
             set_categoria(nombre, categoria_bot)
             categoria_existente = categoria_bot
         
