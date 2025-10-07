@@ -715,22 +715,14 @@ def es_entero_positivo(texto: str) -> bool:
 def es_decimal_positivo(texto: str) -> bool:
     return bool(re.fullmatch(r"\d+(\.\d+)?", texto)) and float(texto) > 0
 
-def barra_progreso(total: int, limite: int, ancho: int = 8) -> str:
+def barra_progreso(total: int, limite: int, ancho: int = 10) -> str:
     if limite <= 0:
-        return "[{}]".format("░"*ancho)
+        return "[{}]".format("▢"*ancho)
     ratio = max(0.0, min(1.0, total/limite))
-    # Cuartiles: 0, 25, 50, 75, 100 -> 0,2,4,6,8 bloques
-    if ratio == 0:
-        bloques = 0
-    elif ratio <= 0.25:
-        bloques = 2
-    elif ratio <= 0.50:
-        bloques = 4
-    elif ratio <= 0.75:
-        bloques = 6
-    else:
-        bloques = 8
-    return "[{}{}]".format("█"*bloques, "░"*(ancho-bloques))
+    llenos = int(ratio * ancho)  # cada bloque representa 10% si ancho=10
+    llenos = max(0, min(ancho, llenos))
+    vacios = ancho - llenos
+    return "[{}{}]".format("▣"*llenos, "▢"*vacios)
 
 # =========================
 # FUNCIONES DE LIMPIEZA AUTOMÁTICA
