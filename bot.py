@@ -293,6 +293,9 @@ def get_categoria(item: str):
     for cat, items in categorias.items():
         if item_norm in items:
             return cat
+    # Heurística por palabras clave
+    if "railgun" in item_norm:
+        return "Armas"
     return None
 
 def set_categoria(item: str, categoria: str):
@@ -1601,7 +1604,7 @@ class BotoneraView(discord.ui.View):
                 continue
             mensaje += f"**__{emoji_cat_map.get(cat,'📦')} {cat}__**\n"
             for item in items:
-                icono = iconos.get(item, "📦")
+                icono = emoji_cat_map.get(cat, "📦")
                 limite_item = obtener_limite(item)
                 detalles = []
                 # Obtener todos los usuarios que tienen este item
