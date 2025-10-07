@@ -1582,9 +1582,15 @@ class BotoneraView(discord.ui.View):
     async def inventario_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         inventario_actual = get_inventario()
         if not inventario_actual:
-            await interaction.response.send_message("📦 Inventario vacío.", ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send("📦 Inventario vacío.", ephemeral=True)
+            else:
+                await interaction.response.send_message("📦 Inventario vacío.", ephemeral=True)
             await self.volver_menu(interaction)
             return
+        # Evitar expiración de la interacción mientras se construye el mensaje
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         # Construir un mapa categoria -> [items]
         categoria_a_items_mapa = {"Consumibles": [], "Minerales y materiales": [], "Armas": [], "Armaduras": [], "Medicinas": [], "Otros": []}
         for item, cant in inventario_actual.items():
@@ -1621,7 +1627,7 @@ class BotoneraView(discord.ui.View):
                     mensaje += f"{icono} {item} — {inventario_actual[item]}/{limite_item} {barra} | {reparto}\n"
                 else:
                     mensaje += f"{icono} {item} — {inventario_actual[item]}/{limite_item} {barra}\n"
-        await interaction.response.send_message(mensaje, ephemeral=True)
+        await interaction.followup.send(mensaje, ephemeral=True)
         await self.volver_menu(interaction)
 
     # -----------------
