@@ -1308,6 +1308,9 @@ class BotoneraView(discord.ui.View):
                 for linea in reputacion_ganada:
                     mensaje += f"{linea}\n"
             
+            # Truncar mensaje si excede 2000 caracteres (límite de Discord)
+            if len(mensaje) > 2000:
+                mensaje = mensaje[:1900] + "\n\n... (historial truncado)"
             await interaction.response.send_message(mensaje, ephemeral=True)
         await self.volver_menu(interaction)
 
